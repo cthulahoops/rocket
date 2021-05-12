@@ -19,7 +19,7 @@ def api_url(resource, resource_id=None):
 
 def parse_response(response):
     if response.status_code != 200:
-        raise Exception(response.status_code, response.body)
+        raise Exception(response.status_code, response.text)
     return response.json()
 
 
