@@ -168,10 +168,10 @@ class GarbageCollectionBot:
         while True:
             if self.garbage_queue.qsize() <= 3:
                 print("Not enough garbage, let's just rest a bit!")
-                eventlet.sleep(20)
+                eventlet.sleep(60)
             elif self.garbage:
                 print("Hey, we're already busy here.")
-                eventlet.sleep(20)
+                eventlet.sleep(60)
             else:
                 self.collect(self.garbage_queue.get())
 
@@ -188,7 +188,7 @@ class GarbageCollectionBot:
         self.garbage_bot.update(self.garbage["pos"])
 
     def complete_collection(self):
-        eventlet.sleep(5)
+        eventlet.sleep(15)
         print("Ready to complete collection!")
         rctogether.delete_bot(self.garbage["id"])
         self.garbage = None
