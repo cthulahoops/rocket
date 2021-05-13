@@ -23,6 +23,10 @@ LAUNCH_PAD = {"x": 25, "y": 60}
 TARGETS = {}
 ROCKET_LOCATION = None
 
+def normalise_name(name):
+    if name is None:
+        return None
+    return name.strip("\n\r\t \u200b")
 
 def first_name(s):
     return s.split(" ")[0]
@@ -96,7 +100,7 @@ class ClankyBotLauchSystem:
             self.rocket.update(LAUNCH_PAD)
         else:
             self.instigator = entity.get("updated_by").get("name")
-            self.target = note_text
+            self.target = normalise_name(note_text)
             if self.target in TARGETS:
                 self.rocket.update(TARGETS[self.target])
 
@@ -124,7 +128,7 @@ class ClankyBotLauchSystem:
 
 
     def handle_entity(self, entity):
-        person_name = entity.get("person_name")
+        person_name = normalise_name(entity.get("person_name"))
         if person_name:
             TARGETS[person_name] = entity["pos"]
 
