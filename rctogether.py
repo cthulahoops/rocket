@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 
 import requests
 from actioncable.connection import Connection
@@ -54,6 +55,14 @@ def update_bot(bot_id, bot_attributes):
     r = requests.patch(url=api_url("bots", bot_id), json={"bot": bot_attributes})
     return parse_response(r)
 
+def with_tracebacks(f):
+    def wrapper(*a, **k):
+        try:
+            f(*a, **k)
+        except Exception:
+            traceback.print_exc()
+            raise
+    return wrapper
 
 def subscribe(on_receive):
     connection = Connection(
@@ -67,7 +76,8 @@ def subscribe(on_receive):
         time.sleep(0.1)
 
     subscription = Subscription(connection, identifier={"channel": "ApiChannel"})
-    subscription.on_receive(on_receive)
+    # Websocket library captures and hides tracebacks, so make sruer
+    subscription.on_receive(with_tracebacks(on_receive))
     subscription.create()
 
     return {"connection": connection, "subscription": subscription}

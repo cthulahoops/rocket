@@ -1,3 +1,8 @@
+import eventlet
+
+eventlet.monkey_patch()
+
+import time
 import logging
 import traceback
 import random
@@ -10,104 +15,201 @@ logging.basicConfig(level=logging.INFO)
 # Control computer. (Note block check for name.)
 # Collision detection.
 
-# Clean up existing bots.
-for bot in rctogether.get_bots():
-    rctogether.delete_bot(bot["id"])
 
-CONTROL_COMPUTER = {'x': 27, 'y': 61}
-LAUNCH_PAD = {'x': 25, 'y': 60}
-TARGET = "Nobody"
+
+CONTROL_COMPUTER = {"x": 27, "y": 61}
+LAUNCH_PAD = {"x": 25, "y": 60}
 
 TARGETS = {}
 ROCKET_LOCATION = None
 
-PAYLOADS = ['💥', '🎉', '🐄', '🔥', '💧', '🌈', '💕', '🦆', '🍅', '🥉']
 
-class ClankyBotLauchSystem:
-    def __init__(self):
-        self.target = "Nobody"
-        self.rocket = self._new_rocket()
+def first_name(s):
+    return s.split(" ")[0]
 
-    def respawn_rocket(self):
-        self.rocket = self._new_rocket()
-        self.target = "Nobody"
+def debris_message(emoji, target, instigator):
+    return PAYLOADS[emoji] % {
+        "victim": first_name(target),
+        "instigator": first_name(instigator),
+    }
 
-    def _new_rocket(self):
-        return rctogether.create_bot(name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD['x'], y=LAUNCH_PAD['y'])
 
-LAUNCH_SYSTEM = ClankyBotLauchSystem()
+PAYLOADS = {
+    "💥": "%(victim)s was exploded by %(instigator)s",
+    "🎉": "%(victim)s was aggressively thanked by %(instigator)s",
+    "🐄": "COW!!!!!",
+    "🔥": "%(victim)s is on fire",
+    "💧": "WATER FIGHT!",
+    "🌈": "%(victim)s got their groove back!",
+    "💕": "%(victim)s was valentined by a secret admirer",
+    "🦆": "Look at %(instigator)s's duck! QUACK! QUACK!",
+    "🍅": "%(victim)s was booed off stage by %(instigator)s",
+    "🥉": "%(victim)s was THIRD PLACED by %(instigator)s",
+}
 
-class GarbageCollectionBot:
-    def __init__(self):
-        self.garbage_bot = rctogether.create_bot(name="Garbage Collector", emoji="🛺", x=22, y=61)
-        self.garbage_queue = []
-        self.garbage = None
+
+class Bot:
+    def __init__(self, name, emoji, x, y):
+        self.bot_json = rctogether.create_bot(name=name, emoji=emoji, x=x, y=y)
+        self.queue = eventlet.Queue()
+        eventlet.spawn(self.run)
 
     @property
     def id(self):
-        return self.garbage_bot['id']
+        return self.bot_json["id"]
 
-    def add_garbage(self, garbage):
-        self.garbage_queue.append(garbage)
-        if self.garbage is None and len(self.garbage_queue) > 3:
-            self.collect()
+    def run(self):
+        while True:
+            update = self.queue.get()
+            while not self.queue.empty():
+                print("Skipping outdated update: ", update)
+                update = self.queue.get()
+            print("Applying update: ", update)
+            eventlet.sleep(1)
+            rctogether.update_bot(self.bot_json["id"], update)
 
-    def collect(self):
-        self.garbage = self.garbage_queue.pop(0)
-        print("Crew dispatched to collect: ", self.garbage)
-        rctogether.update_bot(self.id, self.garbage['pos'])
+    def update(self, update):
+        self.queue.put(update)
 
-    def handle_update(self, entity):
-        if self.garbage and entity['pos'] == self.garbage['pos']:
-            rctogether.delete_bot(self.garbage['id'])
-            self.garbage = None
-            rctogether.update_bot(self.id, {'x': 22, 'y': 61})
+    def update_data(self, data):
+        self.bot_json = data
 
-GC_BOT = GarbageCollectionBot()
 
-def handle_entity(entity):
-    person_name = entity.get("person_name")
-    if person_name:
-        TARGETS[person_name] = entity["pos"]
+class ClankyBotLauchSystem:
+    def __init__(self):
+        self.instigator = None
+        self.target = "Nobody"
+        self.rocket = Bot(name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD["x"], y=LAUNCH_PAD["y"])
+        self.gc_bot = GarbageCollectionBot()
 
-    if person_name == LAUNCH_SYSTEM.target:
-        target_position = entity["pos"]
-        print("Target detected at: ", LAUNCH_SYSTEM.rocket, target_position)
-        rctogether.update_bot(LAUNCH_SYSTEM.rocket["id"], target_position)
-    elif entity.get("pos") == {'x': 27, 'y': 61}:
+    def respawn_rocket(self):
+        self.instigator = None
+        self.rocket = Bot(name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD["x"], y=LAUNCH_PAD["y"])
+        self.target = "Nobody"
+
+    def handle_instruction(self, entity):
         print("New instructions received: ", entity)
         note_text = entity.get("note_text")
-        if note_text == '':
-            LAUNCH_SYSTEM.target = "Nobody"
-            rctogether.update_bot(LAUNCH_SYSTEM.rocket["id"], LAUNCH_PAD)
+        if note_text == "":
+            self.instigator = None
+            self.target = "Nobody"
+            self.rocket.update(LAUNCH_PAD)
         else:
-            LAUNCH_SYSTEM.target = note_text
-            if LAUNCH_SYSTEM.target in TARGETS:
-                rctogether.update_bot(LAUNCH_SYSTEM.rocket["id"], TARGETS[LAUNCH_SYSTEM.target])
-    elif entity['id'] == LAUNCH_SYSTEM.rocket["id"]:
-        LAUNCH_SYSTEM.rocket = entity
-        rocket_position = entity['pos']
-        target_position = TARGETS.get(LAUNCH_SYSTEM.target)
+            self.instigator = entity.get("updated_by").get("name")
+            self.target = note_text
+            if self.target in TARGETS:
+                self.rocket.update(TARGETS[self.target])
 
-        print(rocket_position, target_position)
+    def handle_rocket_move(self, entity):
+        self.rocket.update_data(entity)
+        rocket_position = entity["pos"]
+        target_position = TARGETS.get(self.target)
+
+        print("TARGET HIT: ", rocket_position, target_position)
         if rocket_position == target_position:
-            rctogether.update_bot(LAUNCH_SYSTEM.rocket["id"], {'emoji': random.choice(PAYLOADS)})
-            GC_BOT.add_garbage(LAUNCH_SYSTEM.rocket)
-            LAUNCH_SYSTEM.respawn_rocket()
-    elif entity['id'] == GC_BOT.id:
-        GC_BOT.handle_update(entity)
+            emoji = random.choice(list(PAYLOADS))
+            self.rocket.update(
+                {
+                    "emoji": emoji,
+                    "name": debris_message(emoji, self.target, self.instigator)
+                }
+            )
+            self.gc_bot.add_garbage(self.rocket.bot_json)
+            self.respawn_rocket()
 
-def handle_message(message):
-    try:
+    def handle_target_detected(self, entity):
+        target_position = entity["pos"]
+        print("Target detected at: ", target_position)
+        self.rocket.update(target_position)
+
+
+    def handle_entity(self, entity):
+        person_name = entity.get("person_name")
+        if person_name:
+            TARGETS[person_name] = entity["pos"]
+
+        if entity.get("app") and entity["app"]["name"] == "rocket":
+            print("App entity update: ", entity)
+
+        if person_name == self.target:
+            self.handle_target_detected(entity)
+
+        elif entity.get("pos") == {"x": 27, "y": 61}:
+            self.handle_instruction(entity)
+
+        elif entity["id"] == self.rocket.id:
+            self.handle_rocket_move(entity)
+
+        elif entity["id"] == self.gc_bot.id:
+            self.gc_bot.handle_update(entity)
+
+
+    def handle_message(self, message):
         if message["type"] == "world":
             for entity in message["payload"]["entities"]:
-                handle_entity(entity)
+                self.handle_entity(entity)
         else:
-            handle_entity(message["payload"])
-    except Exception as exc:
-        traceback.print_exc()
-        raise
+            self.handle_entity(message["payload"])
 
 
-subscription = rctogether.subscribe(on_receive=handle_message)
-rctogether.block_until_done(subscription)
+class GarbageCollectionBot:
+    def __init__(self):
+        self.garbage_bot = Bot(name="Garbage Collector", emoji="🛺", x=22, y=61)
+        self.garbage_queue = eventlet.Queue()
+        self.garbage = None
+
+        eventlet.spawn(self.run)
+
+    def run(self):
+        while True:
+            if self.garbage_queue.qsize() <= 3:
+                print("Not enough garbage, let's just rest a bit!")
+                eventlet.sleep(20)
+            elif self.garbage:
+                print("Hey, we're already busy here.")
+                eventlet.sleep(20)
+            else:
+                self.collect(self.garbage_queue.get())
+
+    @property
+    def id(self):
+        return self.garbage_bot.id
+
+    def add_garbage(self, garbage):
+        self.garbage_queue.put(garbage)
+
+    def collect(self, garbage):
+        self.garbage = garbage
+        print("Crew dispatched to collect: ", self.garbage)
+        self.garbage_bot.update(self.garbage["pos"])
+
+    def complete_collection(self):
+        eventlet.sleep(5)
+        print("Ready to complete collection!")
+        rctogether.delete_bot(self.garbage["id"])
+        self.garbage = None
+        self.garbage_bot.update({"x": 22, "y": 61})
+
+    def handle_update(self, entity):
+        if self.garbage and entity["pos"] == self.garbage["pos"]:
+            print("Collection complete: ", entity, self.garbage)
+            eventlet.spawn(self.complete_collection)
+
+def clean_up_bots():
+    for bot in rctogether.get_bots():
+        rctogether.delete_bot(bot["id"])
+
+def main():
+    try:
+        clean_up_bots()
+
+        launch_system = ClankyBotLauchSystem()
+
+        subscription = rctogether.subscribe(on_receive=launch_system.handle_message)
+        rctogether.block_until_done(subscription)
+    finally:
+        print("Exitting... cleaning up.")
+        clean_up_bots()
+
+if __name__ == '__main__':
+    main()
