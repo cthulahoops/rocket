@@ -21,7 +21,7 @@ TARGET = "Nobody"
 TARGETS = {}
 ROCKET_LOCATION = None
 
-PAYLOADS = ['💥', '🎊', '🐄', '🔥', '💧', '🌈']
+PAYLOADS = ['💥', '🎉', '🐄', '🔥', '💧', '🌈', '💕', '🦆', '🍅', '🥉']
 
 class ClankyBotLauchSystem:
     def __init__(self):
