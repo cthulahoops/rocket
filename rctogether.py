@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+import eventlet
 
 import requests
 from actioncable.connection import Connection
@@ -55,6 +56,10 @@ def update_bot(bot_id, bot_attributes):
     r = requests.patch(url=api_url("bots", bot_id), json={"bot": bot_attributes})
     return parse_response(r)
 
+def clean_up_bots():
+    for bot in get_bots():
+        delete_bot(bot["id"])
+
 def with_tracebacks(f):
     def wrapper(*a, **k):
         try:
@@ -64,24 +69,81 @@ def with_tracebacks(f):
             raise
     return wrapper
 
-def subscribe(on_receive):
-    connection = Connection(
-        origin=f"https://{RC_APP_ENDPOINT}",
-        url=f"wss://{RC_APP_ENDPOINT}/cable?app_id={RC_APP_ID}&app_secret={RC_APP_SECRET}",
-    )
-    connection.connect()
+class Bot:
+    def __init__(self, name, emoji, x, y, handle_update=None):
+        self.bot_json = create_bot(name=name, emoji=emoji, x=x, y=y)
+        self.queue = eventlet.Queue()
+        self.handle_update = handle_update
+#       eventlet.spawn(self.run)
 
-    while not connection.connected:
-        # TODO - use callbacks to detect connection!
-        time.sleep(0.1)
+    @property
+    def id(self):
+        return self.bot_json["id"]
 
-    subscription = Subscription(connection, identifier={"channel": "ApiChannel"})
-    # Websocket library captures and hides tracebacks, so make sruer
-    subscription.on_receive(with_tracebacks(on_receive))
-    subscription.create()
+    def run(self):
+        while True:
+            update = self.queue.get()
+            while not self.queue.empty():
+                print("Skipping outdated update: ", update)
+                update = self.queue.get()
+            print("Applying update: ", update)
+            eventlet.sleep(1)
+            update_bot(self.bot_json["id"], update)
 
-    return {"connection": connection, "subscription": subscription}
+    def update(self, update):
+        update_bot(self.bot_json["id"], update)
+        # - self.queue.put(update)
+
+    def update_data(self, data):
+        self.bot_json = data
+
+    def handle_entity(self, entity):
+        print("Bot update!")
+        self.bot_json = entity
+        self.handle_update(entity)
 
 
-def block_until_done(subscription):
-    subscription["connection"].ws_thread.join()
+class RcTogether:
+    def __init__(self, callbacks=[]):
+        self.connection = Connection(
+            origin=f"https://{RC_APP_ENDPOINT}",
+            url=f"wss://{RC_APP_ENDPOINT}/cable?app_id={RC_APP_ID}&app_secret={RC_APP_SECRET}",
+        )
+        self.connection.connect()
+
+        while not self.connection.connected:
+            # TODO - use callbacks to detect connection!
+            time.sleep(0.1)
+
+        self.subscription = Subscription(self.connection, identifier={"channel": "ApiChannel"})
+        # Websocket library captures and hides tracebacks, so make sruer
+        self.subscription.on_receive(with_tracebacks(self.handle_message))
+        self.subscription.create()
+
+        self.callbacks = callbacks
+        self.bots = {}
+
+    def block_until_done(self):
+        self.connection.ws_thread.join()
+
+    def create_bot(self, name, emoji, x, y, handle_update):
+        bot = Bot(name, emoji, x, y, handle_update)
+        self.bots[bot.id] = bot
+        return bot
+
+    def handle_message(self, message):
+        if message["type"] == "world":
+            for entity in message["payload"]["entities"]:
+                self.handle_entity(entity)
+        else:
+            self.handle_entity(message["payload"])
+
+    def handle_entity(self, entity):
+        for callback in self.callbacks:
+            callback(entity)
+
+        if entity['id'] in self.bots:
+            self.bots[entity['id']].handle_entity(entity)
+
+    def add_callback(self, callback):
+        self.callbacks.append(callback)

@@ -147,15 +147,6 @@ class ClankyBotLauchSystem:
         elif entity["id"] == self.gc_bot.id:
             self.gc_bot.handle_update(entity)
 
-
-    def handle_message(self, message):
-        if message["type"] == "world":
-            for entity in message["payload"]["entities"]:
-                self.handle_entity(entity)
-        else:
-            self.handle_entity(message["payload"])
-
-
 class GarbageCollectionBot:
     def __init__(self):
         self.garbage_bot = Bot(name="Garbage Collector", emoji="🛺", x=22, y=61)
@@ -199,21 +190,17 @@ class GarbageCollectionBot:
             print("Collection complete: ", entity, self.garbage)
             eventlet.spawn(self.complete_collection)
 
-def clean_up_bots():
-    for bot in rctogether.get_bots():
-        rctogether.delete_bot(bot["id"])
-
 def main():
     try:
-        clean_up_bots()
+        rctogether.clean_up_bots()
 
         launch_system = ClankyBotLauchSystem()
 
-        subscription = rctogether.subscribe(on_receive=launch_system.handle_message)
-        rctogether.block_until_done(subscription)
+        subscription = rctogether.RcTogether(callbacks=[launch_system.handle_entity])
+        subscription.block_until_done()
     finally:
         print("Exitting... cleaning up.")
-        clean_up_bots()
+        rctogether.clean_up_bots()
 
 if __name__ == '__main__':
     main()
