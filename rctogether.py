@@ -35,7 +35,7 @@ def delete_bot(bot_id):
     return parse_response(r)
 
 
-def create_bot(name, emoji, x=5, y=2, direction="right", can_be_mentioned=True):
+def create_bot(name, emoji, x=5, y=2, direction="right", can_be_mentioned=False):
     r = requests.post(
         url=api_url("bots"),
         json={
@@ -113,7 +113,9 @@ class RcTogether:
 
         while not self.connection.connected:
             # TODO - use callbacks to detect connection!
+            print("Waiting for connection.")
             time.sleep(0.1)
+
 
         self.subscription = Subscription(self.connection, identifier={"channel": "ApiChannel"})
         # Websocket library captures and hides tracebacks, so make sruer

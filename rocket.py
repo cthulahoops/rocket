@@ -158,7 +158,6 @@ class GarbageCollectionBot:
     def run(self):
         while True:
             if self.garbage_queue.qsize() <= 3:
-                print("Not enough garbage, let's just rest a bit!")
                 eventlet.sleep(60)
             elif self.garbage:
                 print("Hey, we're already busy here.")
