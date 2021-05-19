@@ -102,7 +102,7 @@ class Agency:
 
     def handle_mention(self, adopter, message):
         print(message)
-        m = re.search(r'adopt (a|an|the|one)? ([A-Za-z-]+),? please', message['text'])
+        m = re.search(r'adopt (a|an|the|one)? ([A-Za-z-]+),? please', message['text'], re.IGNORECASE)
         if m:
             animal_name = m.groups()[1]
             animal = self.get_by_name(animal_name)
@@ -118,6 +118,27 @@ class Agency:
             self.owned_animals[adopter['id']].append(animal)
 
             print("owned_animals: ", self.owned_animals)
+
+            return
+
+        m = re.search(r'adopt (a|an|the|one)? ([A-Za-z-]+)', message['text'], re.IGNORECASE)
+        if m:
+            rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** Our pets are only available to polite homes.")
+            return
+
+        m = re.search("thank", message['text'], re.IGNORECASE)
+        if m:
+            welcomes = ["You're welcome!", "No problem!", "❤️"]
+            rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** {random.choice(welcomes)}")
+            return
+
+        m = re.search("time to restock", message['text'], re.IGNORECASE)
+        if m:
+            self.restock_inventory()
+            rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** New pets now in stock!")
+            return
+
+        rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}**, sorry I don't understand. Would you like to adopt a pet?")
 
     def handle_entity(self, entity):
         if entity['type'] == 'Avatar':
