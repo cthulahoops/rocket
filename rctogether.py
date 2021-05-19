@@ -11,6 +11,8 @@ RC_APP_ID = os.environ["RC_APP_ID"]
 RC_APP_SECRET = os.environ["RC_APP_SECRET"]
 RC_APP_ENDPOINT = os.environ.get("RC_ENDPOINT", "recurse.rctogether.com")
 
+class HttpError(Exception):
+    pass
 
 def api_url(resource, resource_id=None):
     if resource_id is not None:
@@ -21,7 +23,7 @@ def api_url(resource, resource_id=None):
 
 def parse_response(response):
     if response.status_code != 200:
-        raise Exception(response.status_code, response.text)
+        raise HttpError(response.status_code, response.text)
     return response.json()
 
 
@@ -56,29 +58,49 @@ def update_bot(bot_id, bot_attributes):
     r = requests.patch(url=api_url("bots", bot_id), json={"bot": bot_attributes})
     return parse_response(r)
 
+def send_message(bot_id, message_text):
+    r = requests.post(
+            url=api_url("messages"),
+            json={"bot_id": bot_id, "text": message_text}
+    )
+    return parse_response(r)
+
 def clean_up_bots():
     for bot in get_bots():
         delete_bot(bot["id"])
 
 def with_tracebacks(f):
-    def wrapper(*a, **k):
+    def wrapper(*args, **kwargs):
         try:
-            f(*a, **k)
+            f(*args, **kwargs)
         except Exception:
             traceback.print_exc()
             raise
     return wrapper
 
 class Bot:
-    def __init__(self, name, emoji, x, y, handle_update=None):
-        self.bot_json = create_bot(name=name, emoji=emoji, x=x, y=y)
+    def __init__(self, json, handle_update=None):
+        self.bot_json = json
         self.queue = eventlet.Queue()
         self.handle_update = handle_update
-#       eventlet.spawn(self.run)
+        eventlet.spawn(self.run)
+
+    @classmethod
+    def create(cls, name, emoji, x, y, handle_update=None, can_be_mentioned=False):
+        json = create_bot(name=name, emoji=emoji, x=x, y=y, can_be_mentioned=can_be_mentioned)
+        return cls(json, handle_update)
 
     @property
     def id(self):
         return self.bot_json["id"]
+
+    @property
+    def emoji(self):
+        return self.bot_json["emoji"]
+
+    @property
+    def name(self):
+        return self.bot_json["name"]
 
     def run(self):
         while True:
@@ -88,11 +110,13 @@ class Bot:
                 update = self.queue.get()
             print("Applying update: ", update)
             eventlet.sleep(1)
-            update_bot(self.bot_json["id"], update)
+            try:
+                update_bot(self.id, update)
+            except HttpError as exc:
+                print(f"Update failed: {self!r}, {exc!r}")
 
     def update(self, update):
-        update_bot(self.bot_json["id"], update)
-        # - self.queue.put(update)
+        self.queue.put(update)
 
     def update_data(self, data):
         self.bot_json = data
@@ -101,6 +125,9 @@ class Bot:
         print("Bot update!")
         self.bot_json = entity
         self.handle_update(entity)
+
+    def __repr__(self):
+        return "<Bot name=%r>" % (self.name,)
 
 
 class RcTogether:
@@ -115,6 +142,7 @@ class RcTogether:
             # TODO - use callbacks to detect connection!
             print("Waiting for connection.")
             time.sleep(0.1)
+        print("Connected.")
 
 
         self.subscription = Subscription(self.connection, identifier={"channel": "ApiChannel"})
@@ -128,8 +156,8 @@ class RcTogether:
     def block_until_done(self):
         self.connection.ws_thread.join()
 
-    def create_bot(self, name, emoji, x, y, handle_update):
-        bot = Bot(name, emoji, x, y, handle_update)
+    def create_bot(self, name, emoji, x, y, handle_update, can_be_mentioned=False):
+        bot = Bot.create(name, emoji, x, y, handle_update, can_be_mentioned)
         self.bots[bot.id] = bot
         return bot
 

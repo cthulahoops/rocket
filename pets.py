@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import random
 import re
 import datetime
@@ -94,6 +97,9 @@ class Agency:
                 return animal
         return None
 
+    def random_available_animal(self):
+        return random.choice(list(self.available_animals.values()))
+
     def handle_mention(self, adopter, message):
         print(message)
         m = re.search(r'adopt (a|an|the|one)? ([A-Za-z-]+),? please', message['text'])
@@ -101,6 +107,7 @@ class Agency:
             animal_name = m.groups()[1]
             animal = self.get_by_name(animal_name)
             if not animal:
+                rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** Sorry, we don't have a {animal_name} at the moment, perhaps you'd like a {self.random_available_animal().name} instead?")
                 print("No such animal!")
                 return
             print(animal)
@@ -118,7 +125,7 @@ class Agency:
 
             if message and self.genie.id in message['mentioned_entity_ids']:
                 message_dt = datetime.datetime.strptime(message['sent_at'], "%Y-%m-%dT%H:%M:%SZ")
-                if message_dt < self.processed_message_dt:
+                if message_dt <= self.processed_message_dt:
                     print("Skipping old message: ", message)
                 else:
                     self.handle_mention(entity, message)
@@ -126,11 +133,18 @@ class Agency:
 
         if entity['type'] == 'Avatar':
             for animal in self.owned_animals.get(entity['id'], []):
-                print("Owned animal: ", animal)
-                rctogether.update_bot(animal.id, {'x': entity['pos']['x'] + 1, 'y': entity['pos']['y']})
+                print(entity)
+                position = offset_position(entity['pos'], random.choice(DELTAS))
+                print(f"Moving {animal} to {position}")
+                animal.update(position)
 
         if entity['type'] in ('Avatar', 'Wall', 'Note', 'Desk', 'Bot', 'ZoomLink', 'AudioRoom', 'AudioBlock', 'RC::Calendar', 'Link'):
             return
+
+
+DELTAS = [{'x': x, 'y': y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
+def offset_position(position, delta):
+    return {'x': position['x'] + delta['x'], 'y': position['y'] + delta['y']}
 
 # rctogether.clean_up_bots()
 
