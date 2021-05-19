@@ -105,6 +105,9 @@ class Agency:
         m = re.search(r'adopt (a|an|the|one)? ([A-Za-z-]+),? please', message['text'], re.IGNORECASE)
         if m:
             animal_name = m.groups()[1]
+            if animal_name == 'horse':
+                rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** Sorry, that's just a picture of a horse.")
+                return
             animal = self.get_by_name(animal_name)
             if not animal:
                 rctogether.send_message(self.genie.id, f"@**{adopter['person_name']}** Sorry, we don't have a {animal_name} at the moment, perhaps you'd like a {self.random_available_animal().name} instead?")
