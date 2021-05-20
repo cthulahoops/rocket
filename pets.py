@@ -21,6 +21,8 @@ ANIMALS = [
         {'emoji': '🐑', 'name': 'sheep', 'noise': 'baa!'},
         {'emoji': '🐢', 'name': 'turtle'},
         {'emoji': '🐘', 'name': 'elephant'},
+        {'emoji': '🦉', 'name': 'owl', 'noise': 'hoot hoot!'},
+        {'emoji': '🐉', 'name': 'dragon', 'noise': '🔥'},
         {'emoji': '🚀', 'name': 'rocket'},
         {'emoji': '🦊', 'name': 'fox', 'noise': 'Wrahh!'}
         ]
