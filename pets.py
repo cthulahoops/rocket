@@ -22,6 +22,7 @@ ANIMALS = [
         {'emoji': '🐢', 'name': 'turtle'},
         {'emoji': '🐘', 'name': 'elephant'},
         {'emoji': '🚀', 'name': 'rocket'},
+        {'emoji': '🦊', 'name': 'fox', 'noise': 'Wrahh!'}
         ]
 
 NOISES = {animal['emoji']: animal.get('noise', '💖') for animal in ANIMALS}
