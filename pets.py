@@ -65,7 +65,16 @@ def position_tuple(pos):
     return (pos["x"], pos["y"])
 
 
+
+def response_handler(commands, pattern):
+    def handler(f):
+        commands.append((pattern, f))
+        return f
+    return handler
+
 class Agency:
+    COMMANDS = []
+
     def __init__(self):
         self.genie = None
         self.available_animals = {}
@@ -141,84 +150,67 @@ class Agency:
             sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
 
+
+    @response_handler(COMMANDS, "time to restock")
+    def handle_restock(self, adopter, match):
+        self.restock_inventory()
+        return "New pets now in stock!"
+
+    @response_handler(COMMANDS, "adopt (a|an|the|one)? ([A-Za-z-]+),? please")
+    def handle_adoption(self, adopter, match):
+        animal_name = match.groups()[1]
+
+        if animal_name == "horse":
+            return "Sorry, that's just a picture of a horse."
+
+        if animal_name == "genie":
+            return "You can't adopt me. I'm not a pet!"
+
+        animal = self.get_by_name(animal_name)
+
+        if not animal:
+            alternative = self.random_available_animal().name
+            return f"Sorry, we don't have {a_an(animal_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
+
+        self.send_message(adopter, NOISES.get(animal.emoji, '💖'), animal)
+
+        rctogether.update_bot(
+            animal.id, {"name": f"{adopter['person_name']}'s {animal.name}"}
+        )
+        del self.available_animals[position_tuple(animal.bot_json["pos"])]
+        self.owned_animals[adopter["id"]].append(animal)
+
+        return None
+
+    @response_handler(COMMANDS, r"adopt (a|an|the|one)? ([A-Za-z-]+)")
+    def handle_rudeness(self, adopter, match):
+        return "No please? Our pets are only available to polite homes."
+
+    @response_handler(COMMANDS, "thank")
+    def handle_thanks(self, adopter, match):
+        return random.choice(["You're welcome!", "No problem!", "❤️"])
+
+    @response_handler(COMMANDS, r"abandon my ([A-Za-z-]+)")
+    def handle_abandonment(self, adopter, match):
+        animal_name = match.groups()[0]
+        animal = self.pop_owned_by_type(animal_name, adopter)
+
+        if not animal:
+            suggested_alternative = self.random_owned(adopter).name.split(' ')[-1]
+            return f"Sorry, you don't have {a_an(animal_name)}. Would you like to abandon your {suggested_alternative} instead?"
+
+        self.send_message(adopter, sad_message(animal_name), animal)
+        rctogether.delete_bot(animal.id)
+        return None
+
     def handle_mention(self, adopter, message):
-        print(message)
-        m = re.search(
-            r"adopt (a|an|the|one)? ([A-Za-z-]+),? please",
-            message["text"],
-            re.IGNORECASE,
-        )
-        if m:
-            animal_name = m.groups()[1]
-            if animal_name == "horse":
-                self.send_message(adopter, "Sorry, that's just a picture of a horse.")
+        for (pattern, handler) in self.COMMANDS:
+            match = re.search(pattern, message["text"], re.IGNORECASE)
+            if match:
+                response = handler(self, adopter, match)
+                if response:
+                    self.send_message(adopter, response)
                 return
-
-            if animal_name == "genie":
-                self.send_message(adopter, "You can't adopt me. I'm not a pet!")
-                return
-
-            animal = self.get_by_name(animal_name)
-            print(animal)
-
-            if not animal:
-                alternative = self.random_available_animal().name
-                self.send_message(
-                    adopter,
-                    f"Sorry, we don't have {a_an(animal_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?",
-                )
-                return
-
-            self.send_message(
-                adopter,
-                NOISES.get(animal.emoji, '💖'),
-                animal,
-            )
-            rctogether.update_bot(
-                animal.id, {"name": f"{adopter['person_name']}'s {animal.name}"}
-            )
-            del self.available_animals[position_tuple(animal.bot_json["pos"])]
-            #  self.available_animals[position_tuple(animal.bot_json["pos"])] = self.spawn_animal(animal['pos'])
-            self.owned_animals[adopter["id"]].append(animal)
-
-            print("owned_animals: ", self.owned_animals)
-
-            return
-
-
-        m = re.search(
-            r"adopt (a|an|the|one)? ([A-Za-z-]+)", message["text"], re.IGNORECASE
-        )
-        if m:
-            self.send_message(
-                adopter, "No please? Our pets are only available to polite homes."
-            )
-            return
-
-        m = re.search("thank", message["text"], re.IGNORECASE)
-        if m:
-            self.send_message(
-                adopter, random.choice(["You're welcome!", "No problem!", "❤️"])
-            )
-            return
-
-        m = re.search("time to restock", message["text"], re.IGNORECASE)
-        if m:
-            self.restock_inventory()
-            self.send_message(adopter, "New pets now in stock!")
-            return
-
-        m = re.search(r"abandon my ([A-Za-z-]+)", message["text"], re.IGNORECASE)
-        if m:
-            animal_name = m.groups()[0]
-            animal = self.pop_owned_by_type(animal_name, adopter)
-            if animal:
-                self.send_message(adopter, sad_message(animal_name), animal)
-                rctogether.delete_bot(animal.id)
-            else:
-                self.send_message(adopter, f"Sorry, you don't have a {animal_name}. Would you like to abandon your {self.random_owned(adopter).name.split(' ')[-1]} instead?")
-            return
-
 
         self.send_message(
             adopter, "Sorry, I don't understand. Would you like to adopt a pet?"
@@ -253,6 +245,7 @@ def offset_position(position, delta):
     return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
 
-agency = Agency()
-subscription = rctogether.RcTogether(callbacks=[agency.handle_entity])
-subscription.block_until_done()
+if __name__ == '__main__':
+    agency = Agency()
+    subscription = rctogether.RcTogether(callbacks=[agency.handle_entity])
+    subscription.block_until_done()

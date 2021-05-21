@@ -124,7 +124,8 @@ class Bot:
     def handle_entity(self, entity):
         print("Bot update!")
         self.bot_json = entity
-        self.handle_update(entity)
+        if self.handle_update:
+            self.handle_update(entity)
 
     def __repr__(self):
         return "<Bot name=%r>" % (self.name,)
