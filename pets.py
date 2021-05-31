@@ -7,6 +7,7 @@ import eventlet
 
 eventlet.monkey_patch()
 
+
 import rctogether  # pylint: disable=wrong-import-position
 
 ANIMALS = [
@@ -27,6 +28,9 @@ ANIMALS = [
     {"emoji": "🐉", "name": "dragon", "noise": "🔥"},
     {"emoji": "🚀", "name": "rocket"},
     {"emoji": "🦊", "name": "fox", "noise": "Wrahh!"},
+    {"emoji": "🦄", "name": "unicorn", "noise": "✨"},
+    {"emoji": "🦔", "name": "hedgehog", "noise": "scurry, scurry, scurry"},
+    {"emoji": "🦕", "name": "brontosaurus", "noise": "MEEEHHH!"},
     {"emoji": "🐌", "name": "snail", "noise": "slurp!"}
 ]
 
@@ -49,6 +53,10 @@ SAD_MESSAGES = [
         "😢",
         "What will I do now?",
         "But where will I go?",
+        "One day I might learn to trust again...",
+        "I only wanted to make you happy.",
+        "My heart hurts.",
+        "Did I do something wrong?",
         "But why?"
         "💔"]
 
