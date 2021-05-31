@@ -11,7 +11,7 @@ import rctogether
 
 logging.basicConfig(level=logging.INFO)
 
-# Launch station. (Where the rocket start.)
+# Launch station. (Where the rocket starts.)
 # Control computer. (Note block check for name.)
 # Collision detection.
 
@@ -46,14 +46,12 @@ PAYLOADS = {
     "💧": "WATER FIGHT!",
     "🌈": "%(victim)s got their groove back!",
     "💕": "%(victim)s was valentined by a secret admirer",
-    "🦆": "Look at %(instigator)s's duck! QUACK! QUACK!",
     "🍅": "%(victim)s was booed off stage by %(instigator)s",
     "🥉": "%(victim)s was THIRD PLACED by %(instigator)s",
     "☎️": "Hello. We’ve been trying to reach you with a message regarding your car’s extended warranty...",
     "💍": "%(instigator)s has proposed to %(victim)s at a sporting event.",
-    "🦕": "Life finds a way.",
     "🍀": "%(instigator)s has sent good luck to %(victim)s.",
-    "🪴": "%(instigator)s gave %(victim)s a nice gift! But can they keep it alive?",
+    "🌵": "%(instigator)s gave %(victim)s a nice gift! But can they keep it alive?",
     "🏉": "OUCH. %(instigator)s just threw a ball at %(victim)s's head.",
     "🦌": "%(victim)s was mowed down by an errant deer.",
     "🧸": "Sometimes %(victim)s just needs a cozy hug.",
