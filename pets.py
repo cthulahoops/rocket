@@ -27,7 +27,17 @@ ANIMALS = [
     {"emoji": "🐉", "name": "dragon", "noise": "🔥"},
     {"emoji": "🚀", "name": "rocket"},
     {"emoji": "🦊", "name": "fox", "noise": "Wrahh!"},
-    {"emoji": "🐌", "name": "snail", "noise": "slurp!"}
+    {"emoji": "🐌", "name": "snail", "noise": "slurp!"},
+    {"emoji": "🐫", "name": "camel"},
+    {"emoji": "🐇", "name": "rabbit", "noise": "squeak!"},
+    {"emoji": "🐎", "name": "horse", "noise": "Neigh!"},
+    {"emoji": "🐛", "name": "caterpillar", "noise": "munch!"},
+    {"emoji": "🐙", "name": "octopus", "noise": "Never graduate!"},
+    {"emoji": "🦙", "name": "llama"},
+    {"emoji": "🦀", "name": "crab", "noise": "click!"},
+    {"emoji": "🦘", "name": "kangaroo", "noise": "Chortle chortle!"},
+    {"emoji": "🦇", "name": "bat", "noise": "screech!"},
+    {"emoji": "🐄", "name": "cow", "noise": "Moo!"}
 ]
 
 NOISES = {animal["emoji"]: animal.get("noise", "💖") for animal in ANIMALS}
