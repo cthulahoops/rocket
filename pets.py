@@ -87,6 +87,14 @@ def response_handler(commands, pattern):
         return f
     return handler
 
+
+def reset_agency():
+    for bot in rctogether.get_bots():
+        if bot["emoji"] == "🧞":
+            pass
+        elif not bot.get("message"):
+            rctogether.delete_bot(bot["id"])
+
 class Agency:
     COMMANDS = []
 
