@@ -7,7 +7,6 @@ import eventlet
 
 eventlet.monkey_patch()
 
-
 import rctogether  # pylint: disable=wrong-import-position
 
 ANIMALS = [
@@ -31,7 +30,15 @@ ANIMALS = [
     {"emoji": "🦄", "name": "unicorn", "noise": "✨"},
     {"emoji": "🦔", "name": "hedgehog", "noise": "scurry, scurry, scurry"},
     {"emoji": "🦕", "name": "brontosaurus", "noise": "MEEEHHH!"},
-    {"emoji": "🐌", "name": "snail", "noise": "slurp!"}
+    {"emoji": "🐌", "name": "snail", "noise": "slurp!"},
+    {"emoji": "🐫", "name": "camel"},
+    {"emoji": "🐇", "name": "rabbit"},
+    {"emoji": "🐛", "name": "caterpillar", "noise": "munch!"},
+    {"emoji": "🦙", "name": "llama"},
+    {"emoji": "🦀", "name": "crab", "noise": "click!"},
+    {"emoji": "🦘", "name": "kangaroo", "noise": "Chortle chortle!"},
+    {"emoji": "🦇", "name": "bat", "noise": "screech!"},
+    {"emoji": "🐄", "name": "cow", "noise": "Moo!"},
 ]
 
 NOISES = {animal["emoji"]: animal.get("noise", "💖") for animal in ANIMALS}

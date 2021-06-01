@@ -109,11 +109,11 @@ class Bot:
                 print("Skipping outdated update: ", update)
                 update = self.queue.get()
             print("Applying update: ", update)
-            eventlet.sleep(1)
             try:
                 update_bot(self.id, update)
             except HttpError as exc:
                 print(f"Update failed: {self!r}, {exc!r}")
+            eventlet.sleep(1)
 
     def update(self, update):
         self.queue.put(update)
