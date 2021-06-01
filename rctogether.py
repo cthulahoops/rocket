@@ -78,6 +78,8 @@ def with_tracebacks(f):
             raise
     return wrapper
 
+CONNECTION_POOL = eventlet.GreenPool(10)
+
 class Bot:
     def __init__(self, json, handle_update=None):
         self.bot_json = json
@@ -110,7 +112,7 @@ class Bot:
                 update = self.queue.get()
             print("Applying update: ", update)
             try:
-                update_bot(self.id, update)
+                CONNECTION_POOL.spawn(update_bot, self.id, update).wait()
             except HttpError as exc:
                 print(f"Update failed: {self!r}, {exc!r}")
             eventlet.sleep(1)
