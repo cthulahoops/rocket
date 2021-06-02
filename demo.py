@@ -1,13 +1,40 @@
-import rctogether
+import os
+import random
+import requests
 
-destinations = [{'x': 20, 'y': 50}, {'x': 20, 'y': 80}, {'x': 1, 'y': 80}, {'x': 1, 'y': 50}]
+RC_APP_ID = os.environ["RC_APP_ID"]
+RC_APP_SECRET = os.environ["RC_APP_SECRET"]
+RC_APP_ENDPOINT = os.environ.get("RC_ENDPOINT", "recurse.rctogether.com")
 
-def visit_destination(update):
-    print(update)
-    if update['pos'] in destinations:
-        next_pos = destinations[(destinations.index(update['pos']) + 1) % len(destinations)]
-        octopus.update(next_pos)
+def api_url(resource, resource_id=None):
+    if resource_id is not None:
+        resource = f"{resource}/{resource_id}"
 
-subscription = rctogether.RcTogether()
-octopus = subscription.create_bot(name="Test Octopus", emoji="🐙", x=1, y=50, handle_update=visit_destination)
-subscription.block_until_done()
+    return f"https://{RC_APP_ENDPOINT}/api/{resource}?app_id={RC_APP_ID}&app_secret={RC_APP_SECRET}"
+
+def create_snake():
+    x = random.randint(142, 175)
+    y = random.randint(1, 40)
+
+    print("Creating at: ", x, y)
+    response = requests.post(
+        url=api_url("bots"),
+        json={
+            "bot": {
+                "name": "Hisss!!!",
+                "emoji": "🐍",
+                "x": x,
+                "y": y,
+                "direction": "right",
+                "can_be_mentioned": False,
+            }
+        },
+    )
+    print(response.json())
+
+def main():
+    for _ in range(10):
+        create_snake()
+
+if __name__ == '__main__':
+    main()
