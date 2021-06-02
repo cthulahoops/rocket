@@ -1,6 +1,11 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import random
+import threading
 import requests
+import time
 
 RC_APP_ID = os.environ["RC_APP_ID"]
 RC_APP_SECRET = os.environ["RC_APP_SECRET"]
@@ -21,7 +26,7 @@ def create_snake():
         url=api_url("bots"),
         json={
             "bot": {
-                "name": "Hisss!!!",
+                "name": "Green threadsssssssss!",
                 "emoji": "🐍",
                 "x": x,
                 "y": y,
@@ -33,8 +38,14 @@ def create_snake():
     print(response.json())
 
 def main():
+    threads = []
     for _ in range(10):
-        create_snake()
+        gt = eventlet.spawn(create_snake)
+        threads.append(gt)
+
+    for t in threads:
+         gt.wait()
+
 
 if __name__ == '__main__':
     main()

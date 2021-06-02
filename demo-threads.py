@@ -1,5 +1,6 @@
 import os
 import random
+import threading
 import requests
 
 RC_APP_ID = os.environ["RC_APP_ID"]
@@ -21,7 +22,7 @@ def create_snake():
         url=api_url("bots"),
         json={
             "bot": {
-                "name": "Hisss!!!",
+                "name": "OSsss Threadssssss!!!",
                 "emoji": "🐍",
                 "x": x,
                 "y": y,
@@ -33,8 +34,15 @@ def create_snake():
     print(response.json())
 
 def main():
+    threads = []
     for _ in range(10):
-        create_snake()
+        t = threading.Thread(target=create_snake)
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+
 
 if __name__ == '__main__':
     main()
