@@ -7,7 +7,10 @@ import eventlet
 
 eventlet.monkey_patch()
 
+import logging # pylint: disable=wrong-import-position
 import rctogether  # pylint: disable=wrong-import-position
+
+logging.basicConfig(level=logging.INFO)
 
 ANIMALS = [
     {"emoji": "🐕", "name": "dog", "noise": "woof!"},
