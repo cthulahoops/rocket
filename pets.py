@@ -210,6 +210,9 @@ class Agency:
         if animal_name == "genie":
             return "You can't adopt me. I'm not a pet!"
 
+        if animal_name == "apatosaurus":
+            return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
+
         animal = self.get_by_name(animal_name)
 
         if not animal:
