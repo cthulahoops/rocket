@@ -70,6 +70,21 @@ SAD_MESSAGES = [
         "But why?"
         "💔"]
 
+MANNERS = [
+        "please",
+        "bitte",
+        "le do thoil",
+        "sudo",
+        "per favore",
+        "oh mighty djinn",
+        "s'il vous plaît",
+        "s'il vous plait",
+        "svp",
+        "por favor",
+        "kudasai",
+        "onegai shimasu",
+]
+
 def sad_message(animal_name):
     return random.choice(SAD_MESSAGES) % {'animal_name': animal_name}
 
@@ -182,8 +197,11 @@ class Agency:
         self.restock_inventory()
         return "New pets now in stock!"
 
-    @response_handler(COMMANDS, "adopt (a|an|the|one)? ([A-Za-z-]+),? please")
+    @response_handler(COMMANDS, "adopt (a|an|the|one)? ([A-Za-z-]+)")
     def handle_adoption(self, adopter, match):
+        if not any(please in match.string.lower() for please in MANNERS):
+            return "No please? Our pets are only available to polite homes."
+
         animal_name = match.groups()[1]
 
         if animal_name == "horse":
@@ -207,10 +225,6 @@ class Agency:
         self.owned_animals[adopter["id"]].append(animal)
 
         return None
-
-    @response_handler(COMMANDS, r"adopt (a|an|the|one)? ([A-Za-z-]+)")
-    def handle_rudeness(self, adopter, match):
-        return "No please? Our pets are only available to polite homes."
 
     @response_handler(COMMANDS, "thank")
     def handle_thanks(self, adopter, match):
