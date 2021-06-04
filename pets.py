@@ -246,6 +246,10 @@ class Agency:
         rctogether.delete_bot(animal.id)
         return None
 
+    @response_handler(COMMANDS, r"well[- ]actually|feigning surprise|backseat driving|subtle[- ]*ism")
+    def handle_social_rules(self, adopter, match):
+        return "Oh, you're right. Sorry!"
+
     def handle_mention(self, adopter, message):
         for (pattern, handler) in self.COMMANDS:
             match = re.search(pattern, message["text"], re.IGNORECASE)
