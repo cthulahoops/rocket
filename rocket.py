@@ -3,6 +3,7 @@ import random
 import asyncio
 
 import rctogether
+from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
 
