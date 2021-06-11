@@ -1,11 +1,6 @@
-import eventlet
-
-eventlet.monkey_patch()
-
-import time
 import logging
-import traceback
 import random
+import asyncio
 
 import rctogether
 
@@ -15,21 +10,22 @@ logging.basicConfig(level=logging.INFO)
 # Control computer. (Note block check for name.)
 # Collision detection.
 
-
-
 CONTROL_COMPUTER = {"x": 27, "y": 61}
 LAUNCH_PAD = {"x": 25, "y": 60}
 
 TARGETS = {}
 ROCKET_LOCATION = None
 
+
 def normalise_name(name):
     if name is None:
         return None
     return name.strip("\n\r\t \u200b")
 
+
 def first_name(s):
     return s.split(" ")[0]
+
 
 def debris_message(emoji, target, instigator):
     return PAYLOADS[emoji] % {
@@ -55,63 +51,98 @@ PAYLOADS = {
     "🏉": "OUCH. %(instigator)s just threw a ball at %(victim)s's head.",
     "🦌": "%(victim)s was mowed down by an errant deer.",
     "🧸": "Sometimes %(victim)s just needs a cozy hug.",
-    "🐣": "%(instigator)s has bequeathed %(victim)s with newfound responsibilites!"
+    "🐣": "%(instigator)s has bequeathed %(victim)s with newfound responsibilites!",
 }
 
 
 class Bot:
-    def __init__(self, name, emoji, x, y):
-        self.bot_json = rctogether.create_bot(name=name, emoji=emoji, x=x, y=y)
-        self.queue = eventlet.Queue()
-        eventlet.spawn(self.run)
+    def __init__(self, bot_json):
+        self.bot_json = bot_json
+        self.queue = asyncio.Queue()
+        self.task = None
+
+    @classmethod
+    async def create(cls, session, name, emoji, x, y):
+        bot_json = await rctogether.bots.create(
+            session, name=name, emoji=emoji, x=x, y=y
+        )
+        bot = cls(bot_json)
+        bot.task = asyncio.create_task(bot.run(session))
+        return bot
+
+    @property
+    def pos(self):
+        return self.bot_json["pos"]
 
     @property
     def id(self):
         return self.bot_json["id"]
 
-    def run(self):
+    async def run(self, session):
         while True:
-            update = self.queue.get()
-            while not self.queue.empty():
-                print("Skipping outdated update: ", update)
-                update = self.queue.get()
-            print("Applying update: ", update)
-            eventlet.sleep(1)
-            rctogether.update_bot(self.bot_json["id"], update)
+            update = await self.queue.get()
 
-    def update(self, update):
-        self.queue.put(update)
+            while update is not None and not self.queue.empty():
+                print("Skipping outdated update: ", update)
+                update = await self.queue.get()
+
+            print("Applying update: ", update)
+            await rctogether.bots.update(session, self.id, update)
+            await asyncio.sleep(1)
+
+    async def update(self, update):
+        await self.queue.put(update)
+
+    async def destroy(self, session):
+        rctogether.bots.delete(session, self.id)
 
     def update_data(self, data):
         self.bot_json = data
 
 
 class ClankyBotLauchSystem:
-    def __init__(self):
+    def __init__(self, session, rocket, gc_bot):
         self.instigator = None
         self.target = "Nobody"
-        self.rocket = Bot(name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD["x"], y=LAUNCH_PAD["y"])
-        self.gc_bot = GarbageCollectionBot()
+        self.session = session
+        self.rocket = rocket
+        self.gc_bot = gc_bot
 
-    def respawn_rocket(self):
+    @classmethod
+    async def create(cls, session):
+        rocket = await Bot.create(
+            session, name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD["x"], y=LAUNCH_PAD["y"]
+        )
+        gc_bot = await GarbageCollectionBot.create(session)
+
+        print("Rocket is : ", rocket)
+        return cls(session, rocket, gc_bot)
+
+    async def respawn_rocket(self):
         self.instigator = None
-        self.rocket = Bot(name="Rocket Bot", emoji="🚀", x=LAUNCH_PAD["x"], y=LAUNCH_PAD["y"])
+        self.rocket = await Bot.create(
+            self.session,
+            name="Rocket Bot",
+            emoji="🚀",
+            x=LAUNCH_PAD["x"],
+            y=LAUNCH_PAD["y"],
+        )
         self.target = "Nobody"
 
-    def handle_instruction(self, entity):
+    async def handle_instruction(self, entity):
         print("New instructions received: ", entity)
         note_text = entity.get("note_text")
         if note_text == "":
             self.instigator = None
             self.target = "Nobody"
-            self.rocket.update(LAUNCH_PAD)
+            await self.rocket.update(LAUNCH_PAD)
         else:
             self.instigator = entity.get("updated_by").get("name")
             self.target = normalise_name(note_text)
             if self.target in TARGETS:
-                self.rocket.update(TARGETS[self.target])
+                await self.rocket.update(TARGETS[self.target])
 
-    def handle_rocket_move(self, entity):
+    async def handle_rocket_move(self, entity):
         self.rocket.update_data(entity)
         rocket_position = entity["pos"]
         target_position = TARGETS.get(self.target)
@@ -119,94 +150,101 @@ class ClankyBotLauchSystem:
         print("TARGET HIT: ", rocket_position, target_position)
         if rocket_position == target_position:
             emoji = random.choice(list(PAYLOADS))
-            self.rocket.update(
+            await self.rocket.update(
                 {
                     "emoji": emoji,
-                    "name": debris_message(emoji, self.target, self.instigator)
+                    "name": debris_message(emoji, self.target, self.instigator),
                 }
             )
-            self.gc_bot.add_garbage(self.rocket.bot_json)
-            self.respawn_rocket()
+            await self.gc_bot.add_garbage(self.rocket)
+            await self.respawn_rocket()
 
-    def handle_target_detected(self, entity):
+    async def handle_target_detected(self, entity):
         target_position = entity["pos"]
         print("Target detected at: ", target_position)
-        self.rocket.update(target_position)
+        await self.rocket.update(target_position)
 
-
-    def handle_entity(self, entity):
+    async def handle_entity(self, entity):
         person_name = normalise_name(entity.get("person_name"))
         if person_name:
             TARGETS[person_name] = entity["pos"]
 
-        if entity.get("app") and entity["app"]["name"] == "rocket":
-            print("App entity update: ", entity)
-
         if person_name == self.target:
-            self.handle_target_detected(entity)
+            await self.handle_target_detected(entity)
 
         elif entity.get("pos") == {"x": 27, "y": 61}:
-            self.handle_instruction(entity)
+            await self.handle_instruction(entity)
 
         elif entity["id"] == self.rocket.id:
-            self.handle_rocket_move(entity)
+            await self.handle_rocket_move(entity)
 
         elif entity["id"] == self.gc_bot.id:
             self.gc_bot.handle_update(entity)
 
+
 class GarbageCollectionBot:
-    def __init__(self):
-        self.garbage_bot = Bot(name="Garbage Collector", emoji="🛺", x=22, y=61)
-        self.garbage_queue = eventlet.Queue()
+    def __init__(self, session, garbage_bot):
+        self.session = session
+        self.garbage_bot = garbage_bot
+        self.garbage_queue = asyncio.Queue()
         self.garbage = None
 
-        eventlet.spawn(self.run)
+    @classmethod
+    async def create(cls, session):
+        garbage_bot = await Bot.create(
+            session, name="Garbage Collector", emoji="🛺", x=22, y=61
+        )
+        gc_bot = cls(session, garbage_bot)
+        asyncio.create_task(gc_bot.run(session))
+        return gc_bot
 
-    def run(self):
+    async def run(self, session):
         while True:
-            if self.garbage_queue.qsize() <= 3:
-                eventlet.sleep(60)
+            if self.garbage_queue.qsize() <= 0:
+                await asyncio.sleep(60)
             elif self.garbage:
                 print("Hey, we're already busy here.")
-                eventlet.sleep(60)
+                await asyncio.sleep(60)
             else:
-                self.collect(self.garbage_queue.get())
+                await self.collect(await self.garbage_queue.get())
 
     @property
     def id(self):
         return self.garbage_bot.id
 
-    def add_garbage(self, garbage):
-        self.garbage_queue.put(garbage)
+    async def add_garbage(self, garbage):
+        await self.garbage_queue.put(garbage)
 
-    def collect(self, garbage):
+    async def collect(self, garbage):
         self.garbage = garbage
         print("Crew dispatched to collect: ", self.garbage)
-        self.garbage_bot.update(self.garbage["pos"])
+        await self.garbage_bot.update(self.garbage.pos)
 
-    def complete_collection(self):
-        eventlet.sleep(15)
+    async def complete_collection(self):
+        await asyncio.sleep(15)
         print("Ready to complete collection!")
-        rctogether.delete_bot(self.garbage["id"])
+        await self.garbage.destroy(self.session)
         self.garbage = None
-        self.garbage_bot.update({"x": 22, "y": 61})
+        await self.garbage_bot.update({"x": 22, "y": 61})
 
     def handle_update(self, entity):
-        if self.garbage and entity["pos"] == self.garbage["pos"]:
+        if self.garbage and entity["pos"] == self.garbage.pos:
             print("Collection complete: ", entity, self.garbage)
-            eventlet.spawn(self.complete_collection)
+            asyncio.create_task(self.complete_collection())
 
-def main():
-    try:
-        rctogether.clean_up_bots()
 
-        launch_system = ClankyBotLauchSystem()
+async def main():
+    async with rctogether.RestApiSession() as session:
+        try:
+            await rctogether.bots.delete_all(session)
 
-        subscription = rctogether.RcTogether(callbacks=[launch_system.handle_entity])
-        subscription.block_until_done()
-    finally:
-        print("Exitting... cleaning up.")
-        rctogether.clean_up_bots()
+            launch_system = await ClankyBotLauchSystem.create(session)
+            async for entity in rctogether.WebsocketSubscription():
+                await launch_system.handle_entity(entity)
+        finally:
+            print("Exitting... cleaning up.")
+            await rctogether.bots.delete_all(session)
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    asyncio.run(main())
