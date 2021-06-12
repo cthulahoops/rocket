@@ -35,14 +35,18 @@ class Bot:
     def name(self):
         return self.bot_json["name"]
 
-    async def run(self, session):
-        while True:
+    async def get_queued_update(self):
+        update = await self.queue.get()
+
+        while update is not None and not self.queue.empty():
+            print("Skipping outdated update: ", update)
             update = await self.queue.get()
 
-            while update is not None and not self.queue.empty():
-                print("Skipping outdated update: ", update)
-                update = await self.queue.get()
+        return update
 
+    async def run(self, session):
+        while True:
+            update = await self.get_queued_update()
             print("Applying update: ", update)
             try:
                 await rctogether.bots.update(session, self.id, update)

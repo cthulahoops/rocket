@@ -55,6 +55,9 @@ SPAWN_POINTS = [
     {"x": 60, "y": 17},
 ]
 
+CORRAL = {"x": (0, 19), "y": (40, 58)}
+PET_BOREDOM_TIMES = (3600, 5400)
+
 SAD_MESSAGES = [
     "Was I not a good %(animal_name)s?",
     "I thought you liked me.",
@@ -114,6 +117,28 @@ def reset_agency():
         elif not bot.get("message"):
             rctogether.delete_bot(bot["id"])
 
+class Pet(Bot):
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.owned = False
+
+    async def get_queued_update(self):
+        if not self.owned:
+            return await super().get_queued_update()
+
+        try:
+            update = await asyncio.wait_for(self.queue.get(), random.randint(*PET_BOREDOM_TIMES))
+        except asyncio.TimeoutError:
+            return {
+                'x': random.randint(*CORRAL['x']),
+                'y': random.randint(*CORRAL['y'])}
+
+        while update is not None and not self.queue.empty():
+            print("Skipping outdated update: ", update)
+            update = await self.queue.get()
+
+        return update
+
 
 class Agency:
     COMMANDS = []
@@ -125,7 +150,6 @@ class Agency:
         self.owned_animals = owned_animals
         self.processed_message_dt = datetime.datetime.utcnow()
 
-
     @classmethod
     async def create(cls, session):
         genie = None
@@ -133,18 +157,22 @@ class Agency:
         owned_animals = defaultdict(list)
 
         for bot_json in await rctogether.bots.get(session):
-            bot = Bot(bot_json)
-            bot.start_task(session)
 
             if bot_json["emoji"] == "🧞":
-                print("Found the genie!")
-                genie = bot
+                genie = Bot(bot_json)
+                genie.start_task(session)
+                print("Found the genie: ", bot_json)
             else:
+                pet = Pet(bot_json)
+
                 if bot_json.get("message"):
+                    pet.owned = True
                     owner_id = bot_json["message"]["mentioned_entity_ids"][0]
-                    owned_animals[owner_id].append(bot)
+                    owned_animals[owner_id].append(pet)
                 else:
-                    available_animals[position_tuple(bot_json["pos"])] = bot
+                    available_animals[position_tuple(bot_json["pos"])] = pet
+
+                pet.start_task(session)
 
         agency = cls(session, genie, available_animals, owned_animals)
         return agency
@@ -162,7 +190,9 @@ class Agency:
 
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_animals:
-                self.available_animals[position_tuple(pos)] = await self.spawn_animal(pos)
+                self.available_animals[position_tuple(pos)] = await self.spawn_animal(
+                    pos
+                )
 
     async def spawn_animal(self, pos):
         animal = random.choice(ANIMALS)
@@ -201,7 +231,9 @@ class Agency:
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
-        await rctogether.messages.send(self.session, sender.id, f"@**{recipient['person_name']}** {message_text}")
+        await rctogether.messages.send(
+            self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
+        )
 
     @response_handler(COMMANDS, "time to restock")
     async def handle_restock(self, adopter, match):
@@ -234,7 +266,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             animal.id,
-            {"name": f"{adopter['person_name']}'s {animal.name}"}
+            {"name": f"{adopter['person_name']}'s {animal.name}"},
         )
         del self.available_animals[position_tuple(animal.bot_json["pos"])]
         self.owned_animals[adopter["id"]].append(animal)
