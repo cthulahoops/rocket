@@ -120,10 +120,10 @@ def reset_agency():
 class Pet(Bot):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        self.owned = False
+        self.owner = None
 
     async def get_queued_update(self):
-        if not self.owned:
+        if not self.owner:
             return await super().get_queued_update()
 
         try:
@@ -166,8 +166,8 @@ class Agency:
                 pet = Pet(bot_json)
 
                 if bot_json.get("message"):
-                    pet.owned = True
                     owner_id = bot_json["message"]["mentioned_entity_ids"][0]
+                    pet.owner = owner_id
                     owned_animals[owner_id].append(pet)
                 else:
                     available_animals[position_tuple(bot_json["pos"])] = pet
@@ -270,6 +270,7 @@ class Agency:
         )
         del self.available_animals[position_tuple(animal.bot_json["pos"])]
         self.owned_animals[adopter["id"]].append(animal)
+        animal.owner = adopter["id"]
 
         return None
 
