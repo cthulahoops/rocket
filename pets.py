@@ -303,7 +303,7 @@ class Agency:
         return "Oh, you're right. Sorry!"
 
     @response_handler(COMMANDS, r"help")
-    async def handle_help(self):
+    async def handle_help(self, adopter, match):
         return """I can help you adopt a pet! Just send me a message saying 'adopt the <animal type> please'. The agency is just north of the main space. Drop by to the available animals, and read more instructions on the note by the door."""
 
     async def handle_mention(self, adopter, message):
