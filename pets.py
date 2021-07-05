@@ -113,12 +113,14 @@ def response_handler(commands, pattern):
     return handler
 
 
-def reset_agency():
-    for bot in rctogether.get_bots():
-        if bot["emoji"] == "🧞":
-            pass
-        elif not bot.get("message"):
-            rctogether.delete_bot(bot["id"])
+async def reset_agency():
+    async with rctogether.RestApiSession() as session:
+        for bot in await rctogether.bots.get(session):
+            if bot["emoji"] == "🧞":
+                pass
+            elif not bot.get("message"):
+                print("Bot: ", bot)
+                await rctogether.bots.delete(session, bot["id"])
 
 class Pet(Bot):
     def __init__(self, *a, **k):
