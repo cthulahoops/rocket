@@ -221,6 +221,9 @@ class Agency:
                 return animal
         return None
 
+    def get_random(self):
+        return random.choice(list(self.available_animals.values()))
+
     def pop_owned_by_type(self, animal_name, owner):
         for animal in self.owned_animals[owner["id"]]:
             if animal.name.split(" ")[-1] == animal_name:
@@ -261,7 +264,10 @@ class Agency:
         if animal_name == "apatosaurus":
             return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
 
-        animal = self.get_by_name(animal_name)
+        if animal_name == "pet":
+            animal = self.get_random()
+        else:
+            animal = self.get_by_name(animal_name)
 
         if not animal:
             alternative = self.random_available_animal().name
