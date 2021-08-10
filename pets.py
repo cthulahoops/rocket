@@ -43,6 +43,7 @@ ANIMALS = [
     {"emoji": "🐖", "name": "pig", "noise": "oink!"},
     {"emoji": "🐅", "name": "tiger"},
     {"emoji": "🐧", "name": "penguin"},
+    {"emoji": "🐨", "name": "koala", "noise": "gggrrrooowwwlll"},
 ]
 
 NOISES = {animal["emoji"]: animal.get("noise", "💖") for animal in ANIMALS}
