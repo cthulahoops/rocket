@@ -44,7 +44,7 @@ ANIMALS = [
     {"emoji": "🐌", "name": "snail", "noise": "slurp!"},
     {"emoji": "🦖", "name": "t-rex", "noise": "RAWR!"},
     {"emoji": "🐅", "name": "tiger"},
-    {"emoji": "🐢", "name": "turtle"},
+    {"emoji": "🐢", "name": "turtle", "noise": "hiss!"},
     {"emoji": "🦄", "name": "unicorn", "noise": "✨"},
 ]
 
