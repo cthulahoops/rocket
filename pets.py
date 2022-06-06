@@ -91,6 +91,7 @@ MANNERS = [
     "por favor",
     "kudasai",
     "onegai shimasu",
+    "пожалуйста",
 ]
 
 
