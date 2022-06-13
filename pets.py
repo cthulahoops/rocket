@@ -70,6 +70,7 @@ SPAWN_POINTS = [
 
 CORRAL = {"x": (0, 19), "y": (40, 58)}
 PET_BOREDOM_TIMES = (3600, 5400)
+DAY_CARE_CENTER = {"x": (0, 12), "y": (62, 74)}
 
 SAD_MESSAGE_TEMPLATES = [
     "Was I not a good {pet_name}?",
