@@ -101,7 +101,7 @@ def sad_message(animal_name):
 
 def a_an(noun):
     if noun == 'unicorn':
-        return 'an ' + noun
+        return 'a ' + noun
     if noun[0] in "AaEeIiOoUu":
         return "an " + noun
     return "a " + noun
