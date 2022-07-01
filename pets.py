@@ -269,12 +269,19 @@ class Agency:
             return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
 
         if animal_name == "pet":
-            animal = self.get_random()
+            try:
+                animal = self.get_random()
+            except IndexError:
+                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
         else:
             animal = self.get_by_name(animal_name)
 
         if not animal:
-            alternative = self.random_available_animal().name
+            try:
+                alternative = self.random_available_animal().name
+            except IndexError:
+                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
+
             return f"Sorry, we don't have {a_an(animal_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
 
         await self.send_message(adopter, NOISES.get(animal.emoji, "💖"), animal)
@@ -299,7 +306,10 @@ class Agency:
         animal = self.pop_owned_by_type(animal_name, adopter)
 
         if not animal:
-            suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
+            try:
+                suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
+            except IndexError:
+                return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(animal_name)}. Would you like to abandon your {suggested_alternative} instead?"
 
         await self.send_message(adopter, sad_message(animal_name), animal)
