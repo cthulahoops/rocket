@@ -1,3 +1,4 @@
+import os
 import random
 import re
 import datetime
@@ -9,6 +10,13 @@ import rctogether
 from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
+
+def parse_position(position):
+    x, y = position.split(',')
+    return {'x': int(x), 'y': int(y)}
+
+def offset_position(position, delta):
+    return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
 ANIMALS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
@@ -50,15 +58,11 @@ ANIMALS = [
 
 NOISES = {animal["emoji"]: animal.get("noise", "💖") for animal in ANIMALS}
 
-GENIE_HOME = {"x": 60, "y": 15}
+GENIE_NAME = os.environ.get('GENIE_NAME', 'Pet Agency Genie')
+GENIE_HOME = parse_position(os.environ.get('GENIE_HOME', "60,15"))
 SPAWN_POINTS = [
-    {"x": 58, "y": 15},
-    {"x": 58, "y": 13},
-    {"x": 60, "y": 13},
-    {"x": 62, "y": 13},
-    {"x": 62, "y": 15},
-    {"x": 62, "y": 17},
-    {"x": 60, "y": 17},
+    offset_position(GENIE_HOME, {"x": dx, "y": dy})
+    for (dx, dy) in [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (0, 2), (2, 2)]
 ]
 
 CORRAL = {"x": (0, 19), "y": (40, 58)}
@@ -185,20 +189,20 @@ class Agency:
 
                 pet.start_task(session)
 
-        agency = cls(session, genie, available_animals, owned_animals)
-        return agency
-
-    async def restock_inventory(self):
-        if not self.genie:
-            self.genie = await Bot.create(
-                self.session,
-                name="Pet Agency Genie",
+        if not genie:
+            genie = await Bot.create(
+                session,
+                name=GENIE_NAME,
                 emoji="🧞",
                 x=GENIE_HOME["x"],
                 y=GENIE_HOME["y"],
                 can_be_mentioned=True,
             )
 
+        agency = cls(session, genie, available_animals, owned_animals)
+        return agency
+
+    async def restock_inventory(self):
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_animals:
                 self.available_animals[position_tuple(pos)] = await self.spawn_animal(
@@ -364,10 +368,6 @@ class Agency:
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
-
-
-def offset_position(position, delta):
-    return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
 
 async def main():
