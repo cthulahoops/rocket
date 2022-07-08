@@ -213,6 +213,18 @@ class Agency:
         agency = cls(session, genie, available_animals, owned_animals)
         return agency
 
+    async def close(self):
+        if self.genie:
+            await self.genie.close()
+
+        for pet in self.available_animals.values():
+            await pet.close()
+
+        for pet_collection in self.owned_animals.values():
+            for pet in pet_collection:
+                await pet.close()
+
+
     async def restock_inventory(self):
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_animals:

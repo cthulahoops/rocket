@@ -16,6 +16,15 @@ class Bot:
         bot.start_task(session)
         return bot
 
+    async def close(self):
+        if self.task:
+            self.task.cancel()
+            try:
+                await self.task
+            except asyncio.CancelledError:
+                pass
+
+
     def start_task(self, session):
         self.task = asyncio.create_task(self.run(session))
 
