@@ -46,7 +46,10 @@ class Bot:
 
     async def run(self, session):
         while True:
-            update = await self.get_queued_update()
+            try:
+                update = await self.get_queued_update()
+            except RuntimeError:
+                return
             print("Applying update: ", update)
             try:
                 await rctogether.bots.update(session, self.id, update)
