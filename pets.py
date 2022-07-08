@@ -21,7 +21,7 @@ def offset_position(position, delta):
 def is_adjacent(p1, p2):
     return abs(p2['x'] - p1['x']) <= 1 and abs(p2['y'] - p1['y']) <= 1
 
-ANIMALS = [
+PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
     {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
     {"emoji": "🦕", "name": "brontosaurus", "noise": "MEEEHHH!"},
@@ -59,7 +59,7 @@ ANIMALS = [
     {"emoji": "🦄", "name": "unicorn", "noise": "✨"},
 ]
 
-NOISES = {animal["emoji"]: animal.get("noise", "💖") for animal in ANIMALS}
+NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
 GENIE_NAME = os.environ.get('GENIE_NAME', 'Pet Agency Genie')
 GENIE_HOME = parse_position(os.environ.get('GENIE_HOME', "60,15"))
@@ -72,7 +72,7 @@ CORRAL = {"x": (0, 19), "y": (40, 58)}
 PET_BOREDOM_TIMES = (3600, 5400)
 
 SAD_MESSAGES = [
-    "Was I not a good %(animal_name)s?",
+    "Was I not a good %(pet_name)s?",
     "I thought you liked me.",
     "😢",
     "What will I do now?",
@@ -103,8 +103,8 @@ MANNERS = [
 
 THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
 
-def sad_message(animal_name):
-    return random.choice(SAD_MESSAGES) % {"animal_name": animal_name}
+def sad_message(pet_name):
+    return random.choice(SAD_MESSAGES) % {"pet_name": pet_name}
 
 
 def a_an(noun):
@@ -169,18 +169,18 @@ class Agency:
     """
     COMMANDS = []
 
-    def __init__(self, session, genie, available_animals, owned_animals):
+    def __init__(self, session, genie, available_pets, owned_pets):
         self.session = session
         self.genie = genie
-        self.available_animals = available_animals
-        self.owned_animals = owned_animals
+        self.available_pets = available_pets
+        self.owned_pets = owned_pets
         self.processed_message_dt = datetime.datetime.utcnow()
 
     @classmethod
     async def create(cls, session):
         genie = None
-        available_animals = {}
-        owned_animals = defaultdict(list)
+        available_pets = {}
+        owned_pets = defaultdict(list)
 
         for bot_json in await rctogether.bots.get(session):
 
@@ -194,9 +194,9 @@ class Agency:
                 if bot_json.get("message"):
                     owner_id = bot_json["message"]["mentioned_entity_ids"][0]
                     pet.owner = owner_id
-                    owned_animals[owner_id].append(pet)
+                    owned_pets[owner_id].append(pet)
                 else:
-                    available_animals[position_tuple(bot_json["pos"])] = pet
+                    available_pets[position_tuple(bot_json["pos"])] = pet
 
                 pet.start_task(session)
 
@@ -210,65 +210,65 @@ class Agency:
                 can_be_mentioned=True,
             )
 
-        agency = cls(session, genie, available_animals, owned_animals)
+        agency = cls(session, genie, available_pets, owned_pets)
         return agency
 
     async def close(self):
         if self.genie:
             await self.genie.close()
 
-        for pet in self.available_animals.values():
+        for pet in self.available_pets.values():
             await pet.close()
 
-        for pet_collection in self.owned_animals.values():
+        for pet_collection in self.owned_pets.values():
             for pet in pet_collection:
                 await pet.close()
 
 
     async def restock_inventory(self):
         for pos in SPAWN_POINTS:
-            if position_tuple(pos) not in self.available_animals:
-                self.available_animals[position_tuple(pos)] = await self.spawn_animal(
+            if position_tuple(pos) not in self.available_pets:
+                self.available_pets[position_tuple(pos)] = await self.spawn_pet(
                     pos
                 )
 
-    async def spawn_animal(self, pos):
-        animal = random.choice(ANIMALS)
-        while self.available(animal["emoji"]):
-            animal = random.choice(ANIMALS)
+    async def spawn_pet(self, pos):
+        pet = random.choice(PETS)
+        while self.available(pet["emoji"]):
+            pet = random.choice(PETS)
 
         return await Bot.create(
             self.session,
-            name=animal["name"],
-            emoji=animal["emoji"],
+            name=pet["name"],
+            emoji=pet["emoji"],
             x=pos["x"],
             y=pos["y"],
         )
 
-    def available(self, animal):
-        return any(x.emoji == animal for x in self.available_animals.values())
+    def available(self, pet):
+        return any(x.emoji == pet for x in self.available_pets.values())
 
-    def get_by_name(self, animal_name):
-        for animal in self.available_animals.values():
-            if animal.name == animal_name:
-                return animal
+    def get_by_name(self, pet_name):
+        for pet in self.available_pets.values():
+            if pet.name == pet_name:
+                return pet
         return None
 
     def get_random(self):
-        return random.choice(list(self.available_animals.values()))
+        return random.choice(list(self.available_pets.values()))
 
-    def pop_owned_by_type(self, animal_name, owner):
-        for animal in self.owned_animals[owner["id"]]:
-            if animal.name.split(" ")[-1] == animal_name:
-                self.owned_animals[owner["id"]].remove(animal)
-                return animal
+    def pop_owned_by_type(self, pet_name, owner):
+        for pet in self.owned_pets[owner["id"]]:
+            if pet.name.split(" ")[-1] == pet_name:
+                self.owned_pets[owner["id"]].remove(pet)
+                return pet
         return None
 
-    def random_available_animal(self):
-        return random.choice(list(self.available_animals.values()))
+    def random_available_pet(self):
+        return random.choice(list(self.available_pets.values()))
 
     def random_owned(self, owner):
-        return random.choice(self.owned_animals[owner["id"]])
+        return random.choice(self.owned_pets[owner["id"]])
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
@@ -286,42 +286,42 @@ class Agency:
         if not any(please in match.string.lower() for please in MANNERS):
             return "No please? Our pets are only available to polite homes."
 
-        animal_name = match.groups()[1]
+        pet_name = match.groups()[1]
 
-        if animal_name == "horse":
+        if pet_name == "horse":
             return "Sorry, that's just a picture of a horse."
 
-        if animal_name == "genie":
+        if pet_name == "genie":
             return "You can't adopt me. I'm not a pet!"
 
-        if animal_name == "apatosaurus":
+        if pet_name == "apatosaurus":
             return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
 
-        if animal_name == "pet":
+        if pet_name == "pet":
             try:
-                animal = self.get_random()
+                pet = self.get_random()
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
         else:
-            animal = self.get_by_name(animal_name)
+            pet = self.get_by_name(pet_name)
 
-        if not animal:
+        if not pet:
             try:
-                alternative = self.random_available_animal().name
+                alternative = self.random_available_pet().name
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
 
-            return f"Sorry, we don't have {a_an(animal_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
+            return f"Sorry, we don't have {a_an(pet_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
 
-        await self.send_message(adopter, NOISES.get(animal.emoji, "💖"), animal)
+        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         await rctogether.bots.update(
             self.session,
-            animal.id,
-            {"name": f"{adopter['person_name']}'s {animal.name}"},
+            pet.id,
+            {"name": f"{adopter['person_name']}'s {pet.name}"},
         )
-        del self.available_animals[position_tuple(animal.bot_json["pos"])]
-        self.owned_animals[adopter["id"]].append(animal)
-        animal.owner = adopter["id"]
+        del self.available_pets[position_tuple(pet.bot_json["pos"])]
+        self.owned_pets[adopter["id"]].append(pet)
+        pet.owner = adopter["id"]
 
         return None
 
@@ -331,18 +331,18 @@ class Agency:
 
     @response_handler(COMMANDS, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
-        animal_name = match.groups()[0]
-        animal = self.pop_owned_by_type(animal_name, adopter)
+        pet_name = match.groups()[0]
+        pet = self.pop_owned_by_type(pet_name, adopter)
 
-        if not animal:
+        if not pet:
             try:
                 suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
             except IndexError:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
-            return f"Sorry, you don't have {a_an(animal_name)}. Would you like to abandon your {suggested_alternative} instead?"
+            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
 
-        await self.send_message(adopter, sad_message(animal_name), animal)
-        await rctogether.bots.delete(self.session, animal.id)
+        await self.send_message(adopter, sad_message(pet_name), pet)
+        await rctogether.bots.delete(self.session, pet.id)
         return None
 
     @response_handler(
@@ -353,7 +353,7 @@ class Agency:
 
     @response_handler(COMMANDS, r"help")
     async def handle_help(self, adopter, match):
-        return """I can help you adopt a pet! Just send me a message saying 'adopt the <animal type> please'. The agency is just north of the main space. Drop by to see the available animals, and read more instructions on the note by the door."""
+        return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
 
     async def handle_mention(self, adopter, message):
         for (pattern, handler) in self.COMMANDS:
@@ -383,11 +383,11 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            for animal in self.owned_animals.get(entity["id"], []):
+            for pet in self.owned_pets.get(entity["id"], []):
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
-                print(f"Moving {animal} to {position}")
-                await animal.update(position)
+                print(f"Moving {pet} to {position}")
+                await pet.update(position)
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
