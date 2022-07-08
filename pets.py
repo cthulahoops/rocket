@@ -18,6 +18,9 @@ def parse_position(position):
 def offset_position(position, delta):
     return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
+def is_adjacent(p1, p2):
+    return abs(p2['x'] - p1['x']) <= 1 and abs(p2['y'] - p1['y']) <= 1
+
 ANIMALS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
     {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
@@ -98,6 +101,7 @@ MANNERS = [
     "пожалуйста",
 ]
 
+THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
 
 def sad_message(animal_name):
     return random.choice(SAD_MESSAGES) % {"animal_name": animal_name}
@@ -116,11 +120,11 @@ def position_tuple(pos):
 
 
 def response_handler(commands, pattern):
-    def handler(f):
+    def decorator(f):
         commands.append((pattern, f))
         return f
 
-    return handler
+    return decorator
 
 
 async def reset_agency():
@@ -156,6 +160,13 @@ class Pet(Bot):
 
 
 class Agency:
+    """
+        public interface:
+            create (static)
+                (session) -> Agency
+            handle_entity
+                (json_blob)
+    """
     COMMANDS = []
 
     def __init__(self, session, genie, available_animals, owned_animals):
@@ -304,7 +315,7 @@ class Agency:
 
     @response_handler(COMMANDS, "thank")
     async def handle_thanks(self, adopter, match):
-        return random.choice(["You're welcome!", "No problem!", "❤️"])
+        return random.choice(THANKS_RESPONSES)
 
     @response_handler(COMMANDS, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
@@ -327,6 +338,20 @@ class Agency:
     )
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
+
+    @response_handler(COMMANDS, r"pet the ([A-Za-z-]+)")
+    async def handle_pet_a_pet(self, adopter, match):
+        # For the moment this command needs to be addressed to the genie (maybe won't later).
+        # Find any animals next to the speaker of the right type.
+        #  Do we have any animals of the right type next to the speaker?
+
+        animal_type = match.group(0)
+
+        print("Adopter: ", adopter)
+        for pet_family in self.owned_animals.values():
+            for animal in pet_family:
+                if is_adjacent(adopter['pos'], animal.pos) and animal.type == animal_type:
+                    await self.send_message(adopter, NOISES.get(animal.emoji, "💖"), animal)
 
     @response_handler(COMMANDS, r"help")
     async def handle_help(self, adopter, match):
