@@ -1,40 +1,40 @@
-import pytest
 from collections import namedtuple
 import asyncio
 
-import pets
-from bot import Bot
+import pytest
 
-Post = namedtuple('Post', ('path', 'json'))
-Patch = namedtuple('Patch', ('path', 'id', 'json'))
+import pets
+
+Request = namedtuple('Request', ('method', 'path', 'id', 'json'))
 
 class MockSession:
     def __init__(self, get_data):
-        self.posts = []
-        self.patches = []
+        self._queue = asyncio.Queue()
         self.get_data = get_data
 
     async def get(self, path):
         return self.get_data[path]
 
     async def post(self, path, json):
-        self.posts.append(Post(path, json))
-        return
+        await self._queue.put(Request('post', path, None, json))
 
     async def patch(self, path, bot_id, json):
-        self.patches.append(Patch(path, bot_id, json))
+        await self._queue.put(Request('patch', path, bot_id, json))
+
+    async def get_request(self):
+        return await self._queue.get()
 
 
-@pytest.fixture
-def genie():
+@pytest.fixture(name='genie')
+def genie_fixture():
     return {
         'type': 'Bot',
         'id': 1,
         'emoji': "🧞",
     }
 
-@pytest.fixture
-def rocket():
+@pytest.fixture(name='rocket')
+def rocket_fixture():
     return {
         'type': 'Bot',
         'id': 39887,
@@ -43,8 +43,8 @@ def rocket():
         'pos': {'x': 1, 'y': 1}
     }
 
-@pytest.fixture
-def person():
+@pytest.fixture(name='person')
+def person_fixture():
     return {
         'type': 'Avatar',
         'id': 91,
@@ -76,8 +76,8 @@ async def test_thanks(genie, person):
     agency = await pets.Agency.create(session)
 
     await agency.handle_entity(incoming_message(person, genie, 'thanks!'))
-    print(session.posts)
-    message = session.posts[0].json
+    request = await session.get_request()
+    message = request.json
     print(message['text'])
     assert message['bot_id'] == genie_id
     assert response_text(person, message) in pets.THANKS_RESPONSES
@@ -94,7 +94,8 @@ async def test_adopt_unavailable(genie, rocket, person):
 
     await agency.handle_entity(incoming_message(person, genie, 'adopt the dog, please!'))
 
-    message = session.posts[0].json
+    request = await session.get_request()
+    message = request.json
     assert message['bot_id'] == genie['id']
     assert response_text(person, message) == "Sorry, we don't have a dog at the moment, perhaps you'd like a rocket instead?"
 
@@ -111,18 +112,17 @@ async def test_successful_adoption(genie, rocket, person):
 
     await agency.handle_entity(incoming_message(person, genie, 'adopt the rocket, please!'))
 
-    message = session.posts[0].json
-    assert len(session.posts) == 1
+    request = await session.get_request()
+    message = request.json
+
     assert message['bot_id'] == rocket['id']
     assert response_text(person, message) == pets.NOISES["🚀"]
 
-    # Sleep to make sure that the pet has a chance to move.
-    # There should be a better approach than sleeping.
-    await asyncio.sleep(0.01)
+    request = await session.get_request()
 
-    assert session.patches[0] == Patch(path='bots', id=39887, json={'bot': {'name': f"{person['person_name']}'s rocket"}})
+    assert request == Request(method='patch', path='bots', id=rocket['id'], json={'bot': {'name': f"{person['person_name']}'s rocket"}})
 
-    location_update = session.patches[1]
+    location_update = await session.get_request()
     assert pets.is_adjacent(person['pos'], {'x': location_update.json['bot']['x'], 'y': location_update.json['bot']['y']})
 
     await agency.close()
