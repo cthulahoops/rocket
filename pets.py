@@ -176,6 +176,12 @@ class Agency:
         self.owned_pets = owned_pets
         self.processed_message_dt = datetime.datetime.utcnow()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
     @classmethod
     async def create(cls, session):
         genie = None

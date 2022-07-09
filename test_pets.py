@@ -73,16 +73,12 @@ async def test_thanks(genie, person):
         "bots": [genie]
     })
 
-    agency = await pets.Agency.create(session)
-
-    await agency.handle_entity(incoming_message(person, genie, 'thanks!'))
-    request = await session.get_request()
-    message = request.json
-    print(message['text'])
-    assert message['bot_id'] == genie_id
-    assert response_text(person, message) in pets.THANKS_RESPONSES
-
-    await agency.close()
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'thanks!'))
+        request = await session.get_request()
+        message = request.json
+        assert message['bot_id'] == genie_id
+        assert response_text(person, message) in pets.THANKS_RESPONSES
 
 @pytest.mark.asyncio
 async def test_adopt_unavailable(genie, rocket, person):
@@ -90,16 +86,13 @@ async def test_adopt_unavailable(genie, rocket, person):
         "bots": [genie, rocket]
     })
 
-    agency = await pets.Agency.create(session)
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'adopt the dog, please!'))
 
-    await agency.handle_entity(incoming_message(person, genie, 'adopt the dog, please!'))
-
-    request = await session.get_request()
-    message = request.json
-    assert message['bot_id'] == genie['id']
-    assert response_text(person, message) == "Sorry, we don't have a dog at the moment, perhaps you'd like a rocket instead?"
-
-    await agency.close()
+        request = await session.get_request()
+        message = request.json
+        assert message['bot_id'] == genie['id']
+        assert response_text(person, message) == "Sorry, we don't have a dog at the moment, perhaps you'd like a rocket instead?"
 
 
 @pytest.mark.asyncio
@@ -108,21 +101,18 @@ async def test_successful_adoption(genie, rocket, person):
         "bots": [genie, rocket]
     })
 
-    agency = await pets.Agency.create(session)
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'adopt the rocket, please!'))
 
-    await agency.handle_entity(incoming_message(person, genie, 'adopt the rocket, please!'))
+        request = await session.get_request()
+        message = request.json
 
-    request = await session.get_request()
-    message = request.json
+        assert message['bot_id'] == rocket['id']
+        assert response_text(person, message) == pets.NOISES["🚀"]
 
-    assert message['bot_id'] == rocket['id']
-    assert response_text(person, message) == pets.NOISES["🚀"]
+        request = await session.get_request()
 
-    request = await session.get_request()
+        assert request == Request(method='patch', path='bots', id=rocket['id'], json={'bot': {'name': f"{person['person_name']}'s rocket"}})
 
-    assert request == Request(method='patch', path='bots', id=rocket['id'], json={'bot': {'name': f"{person['person_name']}'s rocket"}})
-
-    location_update = await session.get_request()
-    assert pets.is_adjacent(person['pos'], {'x': location_update.json['bot']['x'], 'y': location_update.json['bot']['y']})
-
-    await agency.close()
+        location_update = await session.get_request()
+        assert pets.is_adjacent(person['pos'], {'x': location_update.json['bot']['x'], 'y': location_update.json['bot']['y']})
