@@ -167,7 +167,7 @@ class Agency:
             handle_entity
                 (json_blob)
     """
-    COMMANDS = []
+    commands = []
 
     def __init__(self, session, genie, available_pets, owned_pets):
         self.session = session
@@ -276,12 +276,12 @@ class Agency:
             self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
 
-    @response_handler(COMMANDS, "time to restock")
+    @response_handler(commands, "time to restock")
     async def handle_restock(self, adopter, match):
         await self.restock_inventory()
         return "New pets now in stock!"
 
-    @response_handler(COMMANDS, "adopt (a|an|the|one)? ([A-Za-z-]+)")
+    @response_handler(commands, "adopt (a|an|the|one)? ([A-Za-z-]+)")
     async def handle_adoption(self, adopter, match):
         if not any(please in match.string.lower() for please in MANNERS):
             return "No please? Our pets are only available to polite homes."
@@ -325,11 +325,11 @@ class Agency:
 
         return None
 
-    @response_handler(COMMANDS, "thank")
+    @response_handler(commands, "thank")
     async def handle_thanks(self, adopter, match):
         return random.choice(THANKS_RESPONSES)
 
-    @response_handler(COMMANDS, r"abandon my ([A-Za-z-]+)")
+    @response_handler(commands, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
         pet_name = match.groups()[0]
         pet = self.pop_owned_by_type(pet_name, adopter)
@@ -346,17 +346,17 @@ class Agency:
         return None
 
     @response_handler(
-        COMMANDS, r"well[- ]actually|feigning surprise|backseat driving|subtle[- ]*ism"
+        commands, r"well[- ]actually|feigning surprise|backseat driving|subtle[- ]*ism"
     )
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
-    @response_handler(COMMANDS, r"help")
+    @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
 
     async def handle_mention(self, adopter, message):
-        for (pattern, handler) in self.COMMANDS:
+        for (pattern, handler) in self.commands:
             match = re.search(pattern, message["text"], re.IGNORECASE)
             if match:
                 response = await handler(self, adopter, match)
