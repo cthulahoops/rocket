@@ -116,4 +116,4 @@ async def test_successful_adoption(genie, rocket, person):
     assert request == Request(method='patch', path='bots', id=rocket['id'], json={'bot': {'name': f"{person['person_name']}'s rocket"}})
 
     location_update = await session.get_request()
-    assert pets.is_adjacent(person['pos'], {'x': location_update.json['bot']['x'], 'y': location_update.json['bot']['y']})
+    assert pets.is_adjacent(person['pos'], location_update.json['bot'])

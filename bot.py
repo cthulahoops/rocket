@@ -62,6 +62,9 @@ class Bot:
                 await rctogether.bots.update(session, self.id, update)
             except rctogether.api.HttpError as exc:
                 print(f"Update failed: {self!r}, {exc!r}")
+
+            # We want to avoid sending successive updates for the same pet too quickly to
+            # avoid overloading the server.
             await asyncio.sleep(1)
 
     async def update(self, update):
