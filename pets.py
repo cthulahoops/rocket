@@ -216,6 +216,8 @@ class Agency:
         self.genie = genie
         self.available_pets = available_pets
         self.owned_pets = owned_pets
+        self.lured_pets_by_petter = defaultdict(list)
+        self.lured_pets = set()
         self.processed_message_dt = datetime.datetime.utcnow()
 
     async def __aenter__(self):
@@ -450,6 +452,20 @@ class Agency:
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
+    @response_handler(commands, r"pet the ([A-Za-z-]+)")
+    async def handle_pet_a_pet(self, petter, match):
+        # For the moment this command needs to be addressed to the genie (maybe won't later).
+        # Find any pets next to the speaker of the right type.
+        #  Do we have any pets of the right type next to the speaker?
+
+        pet_type = match.group(1)
+
+        for owner in self.owned_pets:
+            for pet in self.owned_pets[owner]:
+                if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
+                    self.lured_pets.add(pet.id)
+                    self.lured_pets_by_petter[petter["id"]].append(pet)
+
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
@@ -482,8 +498,16 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
+            for pet in self.lured_pets_by_petter.get(entity["id"], []):
+                print(entity)
+                position = offset_position(entity["pos"], random.choice(DELTAS))
+                print(f"Moving {pet} to {position}")
+                await pet.update(position)
+
             for pet in self.owned_pets.get(entity["id"], []):
                 if pet.is_in_day_care_center:
+                    continue
+                if pet.id in self.lured_pets:
                     continue
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
