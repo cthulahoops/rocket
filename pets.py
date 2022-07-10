@@ -18,6 +18,9 @@ def parse_position(position):
 def offset_position(position, delta):
     return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
+def is_adjacent(p1, p2):
+    return abs(p2['x'] - p1['x']) <= 1 and abs(p2['y'] - p1['y']) <= 1
+
 ANIMALS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
     {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
