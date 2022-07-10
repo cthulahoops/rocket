@@ -101,6 +101,7 @@ MANNERS = [
     "пожалуйста",
 ]
 
+THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
 
 def sad_message(animal_name):
     return random.choice(SAD_MESSAGES) % {"animal_name": animal_name}
@@ -307,7 +308,7 @@ class Agency:
 
     @response_handler(COMMANDS, "thank")
     async def handle_thanks(self, adopter, match):
-        return random.choice(["You're welcome!", "No problem!", "❤️"])
+        return random.choice(THANKS_RESPONSES)
 
     @response_handler(COMMANDS, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
