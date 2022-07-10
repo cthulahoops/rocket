@@ -120,11 +120,11 @@ def position_tuple(pos):
 
 
 def response_handler(commands, pattern):
-    def handler(f):
+    def decorator(f):
         commands.append((pattern, f))
         return f
 
-    return handler
+    return decorator
 
 
 async def reset_agency():
@@ -160,6 +160,13 @@ class Pet(Bot):
 
 
 class Agency:
+    """
+        public interface:
+            create (static)
+                (session) -> Agency
+            handle_entity
+                (json_blob)
+    """
     COMMANDS = []
 
     def __init__(self, session, genie, available_animals, owned_animals):
