@@ -17,13 +17,8 @@ class Bot:
         return bot
 
     async def close(self):
-        if self.task:
-            self.task.cancel()
-            try:
-                await self.task
-            except asyncio.CancelledError:
-                pass
-
+        await self.queue.put(None)
+        await self.task
 
     def start_task(self, session):
         self.task = asyncio.create_task(self.run(session))
@@ -44,18 +39,24 @@ class Bot:
     def name(self):
         return self.bot_json["name"]
 
-    async def get_queued_update(self):
-        update = await self.queue.get()
-
-        while update is not None and not self.queue.empty():
-            print("Skipping outdated update: ", update)
+    async def queued_updates(self):
+        while True:
             update = await self.queue.get()
 
-        return update
+            while update is not None and not self.queue.empty():
+                next_update = await self.queue.get()
+                if next_update is None:
+                    yield update
+                print("Skipping outdated update: ", update)
+                update = next_update
+
+            if update is None:
+                return
+
+            yield update
 
     async def run(self, session):
-        while True:
-            update = await self.get_queued_update()
+        async for update in self.queued_updates():
             print("Applying update: ", update)
             try:
                 await rctogether.bots.update(session, self.id, update)

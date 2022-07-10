@@ -141,23 +141,19 @@ class Pet(Bot):
         super().__init__(*a, **k)
         self.owner = None
 
-    async def get_queued_update(self):
-        if not self.owner:
-            return await super().get_queued_update()
-
-        try:
-            update = await asyncio.wait_for(self.queue.get(), random.randint(*PET_BOREDOM_TIMES))
-        except asyncio.TimeoutError:
-            return {
-                'x': random.randint(*CORRAL['x']),
-                'y': random.randint(*CORRAL['y'])}
-
-        while update is not None and not self.queue.empty():
-            print("Skipping outdated update: ", update)
-            update = await self.queue.get()
-
-        return update
-
+    async def queued_updates(self):
+        it = super().queued_updates()
+        while True:
+            try:
+                update = await asyncio.wait_for(it.__anext__(), random.randint(*PET_BOREDOM_TIMES))
+                yield update
+            except StopAsyncIteration:
+                return
+            except asyncio.TimeoutError:
+                yield {
+                    'x': random.randint(*CORRAL['x']),
+                    'y': random.randint(*CORRAL['y'])
+                }
 
 class Agency:
     """
