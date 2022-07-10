@@ -439,6 +439,20 @@ class Agency:
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
+    @response_handler(commands, r"pet the ([A-Za-z-]+)")
+    async def handle_pet_a_pet(self, adopter, match):
+        # For the moment this command needs to be addressed to the genie (maybe won't later).
+        # Find any pets next to the speaker of the right type.
+        #  Do we have any pets of the right type next to the speaker?
+
+        pet_type = match.group(0)
+
+        print("Adopter: ", adopter)
+        for pet_family in self.owned_pets.values():
+            for pet in pet_family:
+                if is_adjacent(adopter['pos'], pet.pos) and pet.type == pet_type:
+                    await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
+
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
