@@ -76,6 +76,16 @@ def person_fixture():
     }
 
 
+@pytest.fixture(name="petless_person")
+def petless_person_fixture():
+    return {
+        "type": "Avatar",
+        "id": 81,
+        "person_name": "Petless McPetface",
+        "pos": {"x": 20, "y": 20},
+    }
+
+
 @pytest.fixture(name="owned_cat")
 def owned_cat_fixture(person):
     return {
@@ -278,3 +288,24 @@ async def test_unowned_pets_dont_escape(rocket):
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
         await updates.__anext__()
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        petless_person["pos"] = {"x": 1, "y": 2}  # Cat is at 1,1 - this is adjacent.
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should be ignored
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+
+    location_update = await session.get_request()
+    assert pets.is_adjacent(petless_person["pos"], location_update.json["bot"])
