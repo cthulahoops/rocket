@@ -147,3 +147,16 @@ async def test_successful_abandonment(genie, owned_cat, person):
 
     request = await session.get_request()
     assert request == Request(method='delete', path='bots', id=owned_cat['id'], json=None)
+
+@pytest.mark.asyncio
+async def test_follow_owner(genie, owned_cat, person):
+    session = MockSession({
+        "bots": [genie, owned_cat]
+    })
+
+    async with await pets.Agency.create(session) as agency:
+        person['pos'] = {'x': 50, 'y': 45}
+        await agency.handle_entity(person)
+
+    location_update = await session.get_request()
+    assert pets.is_adjacent(person['pos'], location_update.json['bot'])
