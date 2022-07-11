@@ -143,6 +143,7 @@ class Pet(Bot):
 
     async def queued_updates(self):
         it = super().queued_updates()
+
         while True:
             try:
                 update = await asyncio.wait_for(it.__anext__(), random.randint(*PET_BOREDOM_TIMES))
@@ -150,10 +151,11 @@ class Pet(Bot):
             except StopAsyncIteration:
                 return
             except asyncio.TimeoutError:
-                yield {
-                    'x': random.randint(*CORRAL['x']),
-                    'y': random.randint(*CORRAL['y'])
-                }
+                if self.owner:
+                    yield {
+                        'x': random.randint(*CORRAL['x']),
+                        'y': random.randint(*CORRAL['y'])
+                    }
 
 class Agency:
     """
