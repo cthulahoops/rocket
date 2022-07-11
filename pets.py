@@ -71,8 +71,8 @@ SPAWN_POINTS = [
 CORRAL = {"x": (0, 19), "y": (40, 58)}
 PET_BOREDOM_TIMES = (3600, 5400)
 
-SAD_MESSAGES = [
-    "Was I not a good %(pet_name)s?",
+SAD_MESSAGE_TEMPLATES = [
+    "Was I not a good {pet_name}?",
     "I thought you liked me.",
     "😢",
     "What will I do now?",
@@ -104,7 +104,7 @@ MANNERS = [
 THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
 
 def sad_message(pet_name):
-    return random.choice(SAD_MESSAGES) % {"pet_name": pet_name}
+    return random.choice(SAD_MESSAGE_TEMPLATES).format(pet_name=pet_name)
 
 
 def a_an(noun):
@@ -343,6 +343,9 @@ class Agency:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
 
+        # There may be unhandled updates in the pet's message queue - they don't matter because the exceptions will just be logged.
+        # To be more correct we could push a delete event through the pet's queue.
+        await pet.close()
         await self.send_message(adopter, sad_message(pet_name), pet)
         await rctogether.bots.delete(self.session, pet.id)
         return None

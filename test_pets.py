@@ -21,6 +21,9 @@ class MockSession:
     async def patch(self, path, bot_id, json):
         await self._queue.put(Request('patch', path, bot_id, json))
 
+    async def delete(self, path, bot_id):
+        await self._queue.put(Request('delete', path, bot_id, None))
+
     async def get_request(self):
         return await asyncio.wait_for(self._queue.get(), 0.1)
 
@@ -31,6 +34,7 @@ def genie_fixture():
         'type': 'Bot',
         'id': 1,
         'emoji': "🧞",
+        'name': 'Unit Genie'
     }
 
 @pytest.fixture(name='rocket')
@@ -50,6 +54,17 @@ def person_fixture():
         'id': 91,
         'person_name': 'Faker McFakeface',
         'pos': {'x': 15, 'y': 27}
+    }
+
+@pytest.fixture(name='owned_cat')
+def owned_cat_fixture(person):
+    return {
+        'type': 'Bot',
+        'id': 39887,
+        'name': "Faker McFaceface's cat",
+        'emoji': "🐈",
+        'pos': {'x': 1, 'y': 1},
+        'message': {'mentioned_entity_ids': [person['id']]},
     }
 
 def incoming_message(sender, recipient, message):
@@ -117,3 +132,18 @@ async def test_successful_adoption(genie, rocket, person):
 
     location_update = await session.get_request()
     assert pets.is_adjacent(person['pos'], location_update.json['bot'])
+
+@pytest.mark.asyncio
+async def test_successful_abandonment(genie, owned_cat, person):
+    session = MockSession({
+        "bots": [genie, owned_cat]
+    })
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'I wish to heartlessly abandon my cat!'))
+
+    request = await session.get_request()
+    assert response_text(person, request.json) in [template.format(pet_name='cat') for template in pets.SAD_MESSAGE_TEMPLATES]
+
+    request = await session.get_request()
+    assert request == Request(method='delete', path='bots', id=owned_cat['id'], json=None)
