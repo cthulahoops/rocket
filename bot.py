@@ -1,6 +1,10 @@
 import asyncio
 import rctogether
 
+# We want to avoid sending successive updates for the same pet too quickly to
+# avoid overloading the RC server.
+SLEEP_AFTER_UPDATE = 1
+
 class Bot:
     def __init__(self, bot_json):
         self.bot_json = bot_json
@@ -63,9 +67,7 @@ class Bot:
             except rctogether.api.HttpError as exc:
                 print(f"Update failed: {self!r}, {exc!r}")
 
-            # We want to avoid sending successive updates for the same pet too quickly to
-            # avoid overloading the server.
-            await asyncio.sleep(1)
+            await asyncio.sleep(SLEEP_AFTER_UPDATE)
 
     async def update(self, update):
         await self.queue.put(update)

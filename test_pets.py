@@ -4,6 +4,9 @@ import asyncio
 import pytest
 
 import pets
+import bot
+# Reduce the sleep delay in the bot update code so tests run faster.
+bot.SLEEP_AFTER_UPDATE = 0.01
 
 Request = namedtuple('Request', ('method', 'path', 'id', 'json'))
 
