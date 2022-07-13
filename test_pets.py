@@ -7,6 +7,7 @@ import pets
 import bot
 # Reduce the sleep delay in the bot update code so tests run faster.
 bot.SLEEP_AFTER_UPDATE = 0.01
+pets.PET_BOREDOM_TIMES = (1, 1)
 
 Request = namedtuple('Request', ('method', 'path', 'id', 'json'))
 
@@ -163,3 +164,48 @@ async def test_follow_owner(genie, owned_cat, person):
 
     location_update = await session.get_request()
     assert pets.is_adjacent(person['pos'], location_update.json['bot'])
+
+@pytest.mark.asyncio
+async def test_corral(owned_cat):
+    pet = pets.Pet(owned_cat)
+
+    assert pet.owner == 91
+
+    await pet.update({'x': 2, 'y': 3})
+
+    updates = pet.queued_updates()
+    assert await anext(updates) == {'x': 2, 'y': 3}
+
+    corral_move = await anext(updates)
+    assert pets.CORRAL['x'][0] <= corral_move['x'] <= pets.CORRAL['x'][1]
+    assert pets.CORRAL['y'][0] <= corral_move['y'] <= pets.CORRAL['y'][1]
+
+    await pet.update({'x': 8, 'y': 9})
+    assert await anext(updates) == {'x': 8, 'y': 9}
+
+    corral_move = await anext(updates)
+    assert pets.CORRAL['x'][0] <= corral_move['x'] <= pets.CORRAL['x'][1]
+    assert pets.CORRAL['y'][0] <= corral_move['y'] <= pets.CORRAL['y'][1]
+
+    await pet.update(None)
+    with pytest.raises(StopAsyncIteration):
+        await anext(updates)
+
+@pytest.mark.asyncio
+async def test_unowned_pets_dont_escape(rocket):
+    pet = pets.Pet(rocket)
+
+    assert pet.owner is None
+
+    await pet.update({'x': 2, 'y': 3})
+
+    updates = pet.queued_updates()
+    assert await anext(updates) == {'x': 2, 'y': 3}
+    await asyncio.sleep(1.5)
+
+    await pet.update({'x': 8, 'y': 9})
+    assert await anext(updates) == {'x': 8, 'y': 9}
+
+    await pet.update(None)
+    with pytest.raises(StopAsyncIteration):
+        await anext(updates)

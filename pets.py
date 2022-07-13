@@ -137,25 +137,31 @@ async def reset_agency():
                 await rctogether.bots.delete(session, bot["id"])
 
 class Pet(Bot):
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
-        self.owner = None
+    def __init__(self, bot_json, *a, **k):
+        super().__init__(bot_json, *a, **k)
+        if bot_json.get("message"):
+            self.owner = bot_json["message"]["mentioned_entity_ids"][0]
+        else:
+            self.owner = None
 
     async def queued_updates(self):
-        it = super().queued_updates()
+        updates = super().queued_updates()
 
         while True:
-            try:
-                update = await asyncio.wait_for(it.__anext__(), random.randint(*PET_BOREDOM_TIMES))
-                yield update
-            except StopAsyncIteration:
-                return
-            except asyncio.TimeoutError:
-                if self.owner:
-                    yield {
-                        'x': random.randint(*CORRAL['x']),
-                        'y': random.randint(*CORRAL['y'])
-                    }
+            next_update = asyncio.Task(updates.__anext__())
+            while True:
+                try:
+                    update = await asyncio.wait_for(asyncio.shield(next_update), timeout=random.randint(*PET_BOREDOM_TIMES))
+                    yield update
+                    break
+                except asyncio.TimeoutError:
+                    if self.owner:
+                        yield {
+                            'x': random.randint(*CORRAL['x']),
+                            'y': random.randint(*CORRAL['y'])
+                        }
+                except StopAsyncIteration:
+                    return
 
 class Agency:
     """
@@ -195,10 +201,8 @@ class Agency:
             else:
                 pet = Pet(bot_json)
 
-                if bot_json.get("message"):
-                    owner_id = bot_json["message"]["mentioned_entity_ids"][0]
-                    pet.owner = owner_id
-                    owned_pets[owner_id].append(pet)
+                if pet.owner:
+                    owned_pets[pet.owner].append(pet)
                 else:
                     available_pets[position_tuple(bot_json["pos"])] = pet
 
