@@ -277,15 +277,17 @@ class Agency:
                 return pet
         return None
 
-    def get_owned_by_type(self, pet_name, owner):
+    def get_non_day_care_center_owned_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
-            if pet.name.split(" ")[-1] == pet_name:
+            if pet.name.split(" ")[-1] == pet_name and not pet.is_in_day_care_center:
                 return pet
+        return None
 
     def get_from_day_care_center_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
             if pet.name.split(" ")[-1] == pet_name and pet.is_in_day_care_center:
                 return pet
+        return None
 
     def get_random_from_day_care_center(self, owner):
         pets_in_day_care = [pet for pet in self.owned_pets[owner['id']] if pet.is_in_day_care_center]
@@ -357,7 +359,7 @@ class Agency:
     @response_handler(commands, r"(?:look after|take care of|drop off) my ([A-Za-z]+)")
     async def handle_day_care_drop_off(self, adopter, match):
         pet_name = match.groups()[0]
-        pet = self.get_owned_by_type(pet_name, adopter)
+        pet = self.get_non_day_care_center_owned_by_type(pet_name, adopter)
 
         if not pet:
             try:
