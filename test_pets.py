@@ -84,7 +84,7 @@ def in_day_care_unicorn_fixture(person):
         'emoji': "🦄",
         'pos': {'x': 6, 'y': 70},
         'message': {'mentioned_entity_ids': [person['id']]},
-        'in_day_care_center': True
+        'is_in_day_care_center': True
     }
 
 def incoming_message(sender, recipient, message):
