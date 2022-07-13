@@ -30,7 +30,7 @@ class MockSession:
 
     async def get_request(self):
         return await asyncio.wait_for(self._queue.get(), 0.1)
-    
+
     def pending_requests(self):
         return not self._queue.empty()
 
@@ -72,6 +72,19 @@ def owned_cat_fixture(person):
         'emoji': "🐈",
         'pos': {'x': 1, 'y': 1},
         'message': {'mentioned_entity_ids': [person['id']]},
+    }
+
+
+@pytest.fixture(name='in_day_care_unicorn')
+def in_day_care_unicorn_fixture(person):
+    return {
+        'type': 'Bot',
+        'id': 987,
+        'name': "Faker McFaceface's unicorn",
+        'emoji': "🦄",
+        'pos': {'x': 6, 'y': 70},
+        'message': {'mentioned_entity_ids': [person['id']]},
+        'in_day_care_center': True
     }
 
 def incoming_message(sender, recipient, message):
@@ -175,6 +188,33 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
 
     await asyncio.sleep(1)
     assert not session.pending_requests()
+
+@pytest.mark.asyncio
+async def test_successful_day_care_pick_up(genie, in_day_care_unicorn, person):
+    session = MockSession({
+        "bots": [genie, in_day_care_unicorn]
+    })
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'Could I collect my unicorn, please?'))
+
+    request = await session.get_request()
+    assert response_text(person, request.json) == "✨"
+
+    location_update = await session.get_request()
+    assert pets.is_adjacent(person['pos'], location_update.json['bot'])
+
+@pytest.mark.asyncio
+async def test_wrong_pet_day_care_pick_up(genie, in_day_care_unicorn, person):
+    session = MockSession({
+        "bots": [genie, in_day_care_unicorn]
+    })
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'Could I collect my rocket, please?'))
+
+    request = await session.get_request()
+    assert response_text(person, request.json) == "Sorry, you don't have a rocket to collect. Would you like to collect your unicorn instead?"
 
 
 @pytest.mark.asyncio

@@ -147,7 +147,7 @@ class Pet(Bot):
             self.owner = bot_json["message"]["mentioned_entity_ids"][0]
         else:
             self.owner = None
-        self.in_day_care_center = False
+        self.is_in_day_care_center = bot_json.get('is_in_day_care_center', False)
 
     async def queued_updates(self):
         updates = super().queued_updates()
@@ -160,7 +160,7 @@ class Pet(Bot):
                     yield update
                     break
                 except asyncio.TimeoutError:
-                    if self.owner and not self.in_day_care_center:
+                    if self.owner and not self.is_in_day_care_center:
                         yield {
                             'x': random.randint(*CORRAL['x']),
                             'y': random.randint(*CORRAL['y'])
@@ -250,7 +250,7 @@ class Agency:
         while self.available(pet["emoji"]):
             pet = random.choice(PETS)
 
-        return await Bot.create(
+        return await Pet.create(
             self.session,
             name=pet["name"],
             emoji=pet["emoji"],
@@ -282,6 +282,16 @@ class Agency:
             if pet.name.split(" ")[-1] == pet_name:
                 return pet
 
+    def get_from_day_care_center_by_type(self, pet_name, owner):
+        for pet in self.owned_pets[owner["id"]]:
+            if pet.name.split(" ")[-1] == pet_name and pet.is_in_day_care_center:
+                return pet
+
+    def get_random_from_day_care_center(self, owner):
+        pets_in_day_care = [pet for pet in self.owned_pets[owner['id']] if pet.is_in_day_care_center]
+        if not pets_in_day_care:
+            return None
+        return random.choice(pets_in_day_care)
 
     def random_available_pet(self):
         return random.choice(list(self.available_pets.values()))
@@ -344,7 +354,7 @@ class Agency:
 
         return None
 
-    @response_handler(commands, r"look after my ([A-Za-z]+)")
+    @response_handler(commands, r"(?:look after|take care of|drop off) my ([A-Za-z]+)")
     async def handle_day_care_drop_off(self, adopter, match):
         pet_name = match.groups()[0]
         pet = self.get_owned_by_type(pet_name, adopter)
@@ -355,15 +365,30 @@ class Agency:
             except IndexError:
                 return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
-        
+
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         position = {
                     'x': random.randint(*DAY_CARE_CENTER['x']),
                     'y': random.randint(*DAY_CARE_CENTER['y'])
                    }
         await pet.update(position)
-        pet.in_day_care_center = True
+        pet.is_in_day_care_center = True
         return None
+
+    @response_handler(commands, r"(?:collect|pick up|get) my ([A-Za-z]+)")
+    async def handle_day_care_pick_up(self, adopter, match):
+        pet_name = match.groups()[0]
+        pet = self.get_from_day_care_center_by_type(pet_name, adopter)
+
+        if not pet:
+            suggested_alternative = self.get_random_from_day_care_center(adopter)
+            if not suggested_alternative:
+                return "Sorry, you have no pets in day care. Would you like to drop one off?"
+            suggested_alternative = suggested_alternative.name.split(' ')[-1]
+            return f"Sorry, you don't have {a_an(pet_name)} to collect. Would you like to collect your {suggested_alternative} instead?"
+
+        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
+        pet.is_in_day_care_center = False
 
     @response_handler(commands, "thank")
     async def handle_thanks(self, adopter, match):
@@ -427,7 +452,7 @@ class Agency:
 
         if entity["type"] == "Avatar":
             for pet in self.owned_pets.get(entity["id"], []):
-                if pet.in_day_care_center:
+                if pet.is_in_day_care_center:
                     continue
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
