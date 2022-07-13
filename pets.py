@@ -21,6 +21,9 @@ def offset_position(position, delta):
 def is_adjacent(p1, p2):
     return abs(p2['x'] - p1['x']) <= 1 and abs(p2['y'] - p1['y']) <= 1
 
+def in_region(position, region):
+    return region["x"][0] <= position["x"] <= region["x"][1] and region["y"][0] <= position["y"] <= region["y"][1]
+
 PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
     {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
@@ -144,6 +147,7 @@ class Pet(Bot):
             self.owner = bot_json["message"]["mentioned_entity_ids"][0]
         else:
             self.owner = None
+        self.in_day_care_center = False
 
     async def queued_updates(self):
         updates = super().queued_updates()
@@ -156,7 +160,7 @@ class Pet(Bot):
                     yield update
                     break
                 except asyncio.TimeoutError:
-                    if self.owner:
+                    if self.owner and not self.in_day_care_center:
                         yield {
                             'x': random.randint(*CORRAL['x']),
                             'y': random.randint(*CORRAL['y'])
@@ -273,6 +277,12 @@ class Agency:
                 return pet
         return None
 
+    def get_owned_by_type(self, pet_name, owner):
+        for pet in self.owned_pets[owner["id"]]:
+            if pet.name.split(" ")[-1] == pet_name:
+                return pet
+
+
     def random_available_pet(self):
         return random.choice(list(self.available_pets.values()))
 
@@ -332,6 +342,27 @@ class Agency:
         self.owned_pets[adopter["id"]].append(pet)
         pet.owner = adopter["id"]
 
+        return None
+
+    @response_handler(commands, r"look after my ([A-Za-z]+)")
+    async def handle_day_care_drop_off(self, adopter, match):
+        pet_name = match.groups()[0]
+        pet = self.get_owned_by_type(pet_name, adopter)
+
+        if not pet:
+            try:
+                suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
+            except IndexError:
+                return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
+            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
+        
+        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
+        position = {
+                    'x': random.randint(*DAY_CARE_CENTER['x']),
+                    'y': random.randint(*DAY_CARE_CENTER['y'])
+                   }
+        await pet.update(position)
+        pet.in_day_care_center = True
         return None
 
     @response_handler(commands, "thank")
@@ -396,6 +427,8 @@ class Agency:
 
         if entity["type"] == "Avatar":
             for pet in self.owned_pets.get(entity["id"], []):
+                if pet.in_day_care_center:
+                    continue
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
                 print(f"Moving {pet} to {position}")

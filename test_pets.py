@@ -30,6 +30,9 @@ class MockSession:
 
     async def get_request(self):
         return await asyncio.wait_for(self._queue.get(), 0.1)
+    
+    def pending_requests(self):
+        return not self._queue.empty()
 
 
 @pytest.fixture(name='genie')
@@ -151,6 +154,28 @@ async def test_successful_abandonment(genie, owned_cat, person):
 
     request = await session.get_request()
     assert request == Request(method='delete', path='bots', id=owned_cat['id'], json=None)
+
+@pytest.mark.asyncio
+async def test_successful_day_care_drop_off(genie, owned_cat, person):
+    session = MockSession({
+        "bots": [genie, owned_cat]
+    })
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, 'Please look after my cat!'))
+        person['pos'] = {'x': 50, 'y': 45}
+        await agency.handle_entity(person)
+
+    request = await session.get_request()
+    assert response_text(person, request.json) == "miaow!"
+
+    location_update = await session.get_request()
+    new_position = location_update.json["bot"]
+    assert pets.in_region(new_position, pets.DAY_CARE_CENTER)
+
+    await asyncio.sleep(1)
+    assert not session.pending_requests()
+
 
 @pytest.mark.asyncio
 async def test_follow_owner(genie, owned_cat, person):
