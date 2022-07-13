@@ -149,6 +149,10 @@ class Pet(Bot):
             self.owner = None
         self.is_in_day_care_center = bot_json.get('is_in_day_care_center', False)
 
+    @property
+    def type(self):
+        return self.name.split(' ')[-1]
+
     async def queued_updates(self):
         updates = super().queued_updates()
 
@@ -272,20 +276,20 @@ class Agency:
 
     def pop_owned_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
-            if pet.name.split(" ")[-1] == pet_name:
+            if pet.type == pet_name:
                 self.owned_pets[owner["id"]].remove(pet)
                 return pet
         return None
 
     def get_non_day_care_center_owned_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
-            if pet.name.split(" ")[-1] == pet_name and not pet.is_in_day_care_center:
+            if pet.type == pet_name and not pet.is_in_day_care_center:
                 return pet
         return None
 
     def get_from_day_care_center_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
-            if pet.name.split(" ")[-1] == pet_name and pet.is_in_day_care_center:
+            if pet.type == pet_name and pet.is_in_day_care_center:
                 return pet
         return None
 
@@ -363,7 +367,7 @@ class Agency:
 
         if not pet:
             try:
-                suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
+                suggested_alternative = self.random_owned(adopter).type
             except IndexError:
                 return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
@@ -403,7 +407,7 @@ class Agency:
 
         if not pet:
             try:
-                suggested_alternative = self.random_owned(adopter).name.split(" ")[-1]
+                suggested_alternative = self.random_owned(adopter).type
             except IndexError:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
