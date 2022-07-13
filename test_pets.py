@@ -174,22 +174,22 @@ async def test_corral(owned_cat):
     await pet.update({'x': 2, 'y': 3})
 
     updates = pet.queued_updates()
-    assert await anext(updates) == {'x': 2, 'y': 3}
+    assert await updates.__anext__() == {'x': 2, 'y': 3}
 
-    corral_move = await anext(updates)
+    corral_move = await updates.__anext__()
     assert pets.CORRAL['x'][0] <= corral_move['x'] <= pets.CORRAL['x'][1]
     assert pets.CORRAL['y'][0] <= corral_move['y'] <= pets.CORRAL['y'][1]
 
     await pet.update({'x': 8, 'y': 9})
-    assert await anext(updates) == {'x': 8, 'y': 9}
+    assert await updates.__anext__() == {'x': 8, 'y': 9}
 
-    corral_move = await anext(updates)
+    corral_move = await updates.__anext__()
     assert pets.CORRAL['x'][0] <= corral_move['x'] <= pets.CORRAL['x'][1]
     assert pets.CORRAL['y'][0] <= corral_move['y'] <= pets.CORRAL['y'][1]
 
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
-        await anext(updates)
+        await updates.__anext__()
 
 @pytest.mark.asyncio
 async def test_unowned_pets_dont_escape(rocket):
@@ -200,12 +200,12 @@ async def test_unowned_pets_dont_escape(rocket):
     await pet.update({'x': 2, 'y': 3})
 
     updates = pet.queued_updates()
-    assert await anext(updates) == {'x': 2, 'y': 3}
+    assert await updates.__anext__() == {'x': 2, 'y': 3}
     await asyncio.sleep(1.5)
 
     await pet.update({'x': 8, 'y': 9})
-    assert await anext(updates) == {'x': 8, 'y': 9}
+    assert await updates.__anext__() == {'x': 8, 'y': 9}
 
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
-        await anext(updates)
+        await updates.__anext__()
