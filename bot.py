@@ -5,6 +5,7 @@ import rctogether
 # avoid overloading the RC server.
 SLEEP_AFTER_UPDATE = 1
 
+
 class Bot:
     def __init__(self, bot_json):
         self.bot_json = bot_json

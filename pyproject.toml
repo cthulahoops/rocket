@@ -9,6 +9,7 @@ python = "^3.8"
 rctogether = "^0.3.0"
 
 [tool.poetry.dev-dependencies]
+black = "^22.6.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -11,18 +11,26 @@ from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
 
+
 def parse_position(position):
-    x, y = position.split(',')
-    return {'x': int(x), 'y': int(y)}
+    x, y = position.split(",")
+    return {"x": int(x), "y": int(y)}
+
 
 def offset_position(position, delta):
     return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
+
 def is_adjacent(p1, p2):
-    return abs(p2['x'] - p1['x']) <= 1 and abs(p2['y'] - p1['y']) <= 1
+    return abs(p2["x"] - p1["x"]) <= 1 and abs(p2["y"] - p1["y"]) <= 1
+
 
 def in_region(position, region):
-    return region["x"][0] <= position["x"] <= region["x"][1] and region["y"][0] <= position["y"] <= region["y"][1]
+    return (
+        region["x"][0] <= position["x"] <= region["x"][1]
+        and region["y"][0] <= position["y"] <= region["y"][1]
+    )
+
 
 PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
@@ -64,8 +72,8 @@ PETS = [
 
 NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
-GENIE_NAME = os.environ.get('GENIE_NAME', 'Pet Agency Genie')
-GENIE_HOME = parse_position(os.environ.get('GENIE_HOME', "60,15"))
+GENIE_NAME = os.environ.get("GENIE_NAME", "Pet Agency Genie")
+GENIE_HOME = parse_position(os.environ.get("GENIE_HOME", "60,15"))
 SPAWN_POINTS = [
     offset_position(GENIE_HOME, {"x": dx, "y": dy})
     for (dx, dy) in [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (0, 2), (2, 2)]
@@ -107,13 +115,14 @@ MANNERS = [
 
 THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
 
+
 def sad_message(pet_name):
     return random.choice(SAD_MESSAGE_TEMPLATES).format(pet_name=pet_name)
 
 
 def a_an(noun):
-    if noun == 'unicorn':
-        return 'a ' + noun
+    if noun == "unicorn":
+        return "a " + noun
     if noun[0] in "AaEeIiOoUu":
         return "an " + noun
     return "a " + noun
@@ -140,6 +149,7 @@ async def reset_agency():
                 print("Bot: ", bot)
                 await rctogether.bots.delete(session, bot["id"])
 
+
 class Pet(Bot):
     def __init__(self, bot_json, *a, **k):
         super().__init__(bot_json, *a, **k)
@@ -147,11 +157,11 @@ class Pet(Bot):
             self.owner = bot_json["message"]["mentioned_entity_ids"][0]
         else:
             self.owner = None
-        self.is_in_day_care_center = bot_json.get('is_in_day_care_center', False)
+        self.is_in_day_care_center = bot_json.get("is_in_day_care_center", False)
 
     @property
     def type(self):
-        return self.name.split(' ')[-1]
+        return self.name.split(" ")[-1]
 
     async def queued_updates(self):
         updates = super().queued_updates()
@@ -160,26 +170,31 @@ class Pet(Bot):
             next_update = asyncio.Task(updates.__anext__())
             while True:
                 try:
-                    update = await asyncio.wait_for(asyncio.shield(next_update), timeout=random.randint(*PET_BOREDOM_TIMES))
+                    update = await asyncio.wait_for(
+                        asyncio.shield(next_update),
+                        timeout=random.randint(*PET_BOREDOM_TIMES),
+                    )
                     yield update
                     break
                 except asyncio.TimeoutError:
                     if self.owner and not self.is_in_day_care_center:
                         yield {
-                            'x': random.randint(*CORRAL['x']),
-                            'y': random.randint(*CORRAL['y'])
+                            "x": random.randint(*CORRAL["x"]),
+                            "y": random.randint(*CORRAL["y"]),
                         }
                 except StopAsyncIteration:
                     return
 
+
 class Agency:
     """
-        public interface:
-            create (static)
-                (session) -> Agency
-            handle_entity
-                (json_blob)
+    public interface:
+        create (static)
+            (session) -> Agency
+        handle_entity
+            (json_blob)
     """
+
     commands = []
 
     def __init__(self, session, genie, available_pets, owned_pets):
@@ -241,13 +256,10 @@ class Agency:
             for pet in pet_collection:
                 await pet.close()
 
-
     async def restock_inventory(self):
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_pets:
-                self.available_pets[position_tuple(pos)] = await self.spawn_pet(
-                    pos
-                )
+                self.available_pets[position_tuple(pos)] = await self.spawn_pet(pos)
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
@@ -294,7 +306,9 @@ class Agency:
         return None
 
     def get_random_from_day_care_center(self, owner):
-        pets_in_day_care = [pet for pet in self.owned_pets[owner['id']] if pet.is_in_day_care_center]
+        pets_in_day_care = [
+            pet for pet in self.owned_pets[owner["id"]] if pet.is_in_day_care_center
+        ]
         if not pets_in_day_care:
             return None
         return random.choice(pets_in_day_care)
@@ -374,9 +388,9 @@ class Agency:
 
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         position = {
-                    'x': random.randint(*DAY_CARE_CENTER['x']),
-                    'y': random.randint(*DAY_CARE_CENTER['y'])
-                   }
+            "x": random.randint(*DAY_CARE_CENTER["x"]),
+            "y": random.randint(*DAY_CARE_CENTER["y"]),
+        }
         await pet.update(position)
         pet.is_in_day_care_center = True
         return None
@@ -390,7 +404,7 @@ class Agency:
             suggested_alternative = self.get_random_from_day_care_center(adopter)
             if not suggested_alternative:
                 return "Sorry, you have no pets in day care. Would you like to drop one off?"
-            suggested_alternative = suggested_alternative.name.split(' ')[-1]
+            suggested_alternative = suggested_alternative.name.split(" ")[-1]
             return f"Sorry, you don't have {a_an(pet_name)} to collect. Would you like to collect your {suggested_alternative} instead?"
 
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
