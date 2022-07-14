@@ -262,15 +262,13 @@ async def test_corral(owned_cat):
     assert await updates.__anext__() == {"x": 2, "y": 3}
 
     corral_move = await updates.__anext__()
-    assert pets.CORRAL["x"][0] <= corral_move["x"] <= pets.CORRAL["x"][1]
-    assert pets.CORRAL["y"][0] <= corral_move["y"] <= pets.CORRAL["y"][1]
+    assert pets.in_region(corral_move, pets.CORRAL)
 
     await pet.update({"x": 8, "y": 9})
     assert await updates.__anext__() == {"x": 8, "y": 9}
 
     corral_move = await updates.__anext__()
-    assert pets.CORRAL["x"][0] <= corral_move["x"] <= pets.CORRAL["x"][1]
-    assert pets.CORRAL["y"][0] <= corral_move["y"] <= pets.CORRAL["y"][1]
+    assert pets.in_region(corral_move, pets.CORRAL)
 
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
