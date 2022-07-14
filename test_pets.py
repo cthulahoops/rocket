@@ -36,6 +36,15 @@ class MockSession:
     def pending_requests(self):
         return not self._queue.empty()
 
+    async def message_received(self, sender, recipient):
+        request = await self.get_request()
+        message = request.json
+        assert message["bot_id"] == sender["id"]
+        message_text = message["text"]
+        mention = f"@**{recipient['person_name']}** "
+        assert message_text[: len(mention)] == mention
+        return message_text[len(mention) :]
+
 
 @pytest.fixture(name="genie")
 def genie_fixture():
@@ -97,25 +106,14 @@ def incoming_message(sender, recipient, message):
     return sender
 
 
-def response_text(recipient, message):
-    message_text = message["text"]
-    mention = f"@**{recipient['person_name']}** "
-    assert message_text[: len(mention)] == mention
-    return message_text[len(mention) :]
-
-
 @pytest.mark.asyncio
 async def test_thanks(genie, person):
-    genie_id = genie["id"]
     session = MockSession({"bots": [genie]})
 
     async with await pets.Agency.create(session) as agency:
         await agency.handle_entity(incoming_message(person, genie, "thanks!"))
 
-    request = await session.get_request()
-    message = request.json
-    assert message["bot_id"] == genie_id
-    assert response_text(person, message) in pets.THANKS_RESPONSES
+    assert await session.message_received(genie, person) in pets.THANKS_RESPONSES
 
 
 @pytest.mark.asyncio
@@ -127,11 +125,8 @@ async def test_adopt_unavailable(genie, rocket, person):
             incoming_message(person, genie, "adopt the dog, please!")
         )
 
-    request = await session.get_request()
-    message = request.json
-    assert message["bot_id"] == genie["id"]
     assert (
-        response_text(person, message)
+        await session.message_received(genie, person)
         == "Sorry, we don't have a dog at the moment, perhaps you'd like a rocket instead?"
     )
 
@@ -145,11 +140,7 @@ async def test_successful_adoption(genie, rocket, person):
             incoming_message(person, genie, "adopt the rocket, please!")
         )
 
-    request = await session.get_request()
-    message = request.json
-
-    assert message["bot_id"] == rocket["id"]
-    assert response_text(person, message) == pets.NOISES["🚀"]
+    assert await session.message_received(rocket, person) == pets.NOISES["🚀"]
 
     request = await session.get_request()
 
@@ -173,8 +164,7 @@ async def test_successful_abandonment(genie, owned_cat, person):
             incoming_message(person, genie, "I wish to heartlessly abandon my cat!")
         )
 
-    request = await session.get_request()
-    assert response_text(person, request.json) in [
+    assert await session.message_received(owned_cat, person) in [
         template.format(pet_name="cat") for template in pets.SAD_MESSAGE_TEMPLATES
     ]
 
@@ -195,8 +185,7 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
         person["pos"] = {"x": 50, "y": 45}
         await agency.handle_entity(person)
 
-    request = await session.get_request()
-    assert response_text(person, request.json) == "miaow!"
+    assert await session.message_received(owned_cat, person) == "miaow!"
 
     location_update = await session.get_request()
     new_position = location_update.json["bot"]
@@ -215,8 +204,7 @@ async def test_successful_day_care_pick_up(genie, in_day_care_unicorn, person):
             incoming_message(person, genie, "Could I collect my unicorn, please?")
         )
 
-    request = await session.get_request()
-    assert response_text(person, request.json) == "✨"
+    assert await session.message_received(in_day_care_unicorn, person) == "✨"
 
     location_update = await session.get_request()
     assert pets.is_adjacent(person["pos"], location_update.json["bot"])
@@ -231,9 +219,8 @@ async def test_wrong_pet_day_care_pick_up(genie, in_day_care_unicorn, person):
             incoming_message(person, genie, "Could I collect my rocket, please?")
         )
 
-    request = await session.get_request()
     assert (
-        response_text(person, request.json)
+        await session.message_received(genie, person)
         == "Sorry, you don't have a rocket to collect. Would you like to collect your unicorn instead?"
     )
 
