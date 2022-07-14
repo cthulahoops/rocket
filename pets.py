@@ -25,11 +25,22 @@ def is_adjacent(p1, p2):
     return abs(p2["x"] - p1["x"]) <= 1 and abs(p2["y"] - p1["y"]) <= 1
 
 
-def in_region(position, region):
-    return (
-        region["x"][0] <= position["x"] <= region["x"][1]
-        and region["y"][0] <= position["y"] <= region["y"][1]
-    )
+class Region:
+    def __init__(self, top_left, bottom_right):
+        self.top_left = top_left
+        self.bottom_right = bottom_right
+
+    def __contains__(self, point):
+        return (
+            self.top_left["x"] <= point["x"] <= self.bottom_right["x"]
+            and self.top_left["y"] <= point["y"] <= self.bottom_right["y"]
+        )
+
+    def random_point(self):
+        return {
+            "x": random.randint(self.top_left["x"], self.bottom_right["x"]),
+            "y": random.randint(self.top_left["y"], self.bottom_right["y"]),
+        }
 
 
 PETS = [
@@ -79,9 +90,10 @@ SPAWN_POINTS = [
     for (dx, dy) in [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (0, 2), (2, 2)]
 ]
 
-CORRAL = {"x": (0, 19), "y": (40, 58)}
+CORRAL = Region({"x": 0, "y": 40}, {"x": 19, "y": 58})
+
 PET_BOREDOM_TIMES = (3600, 5400)
-DAY_CARE_CENTER = {"x": (0, 11), "y": (62, 74)}
+DAY_CARE_CENTER = Region({"x": 0, "y": 62}, {"x": 11, "y": 74})
 
 SAD_MESSAGE_TEMPLATES = [
     "Was I not a good {pet_name}?",
@@ -178,10 +190,7 @@ class Pet(Bot):
                     break
                 except asyncio.TimeoutError:
                     if self.owner and not self.is_in_day_care_center:
-                        yield {
-                            "x": random.randint(*CORRAL["x"]),
-                            "y": random.randint(*CORRAL["y"]),
-                        }
+                        yield CORRAL.random_point()
                 except StopAsyncIteration:
                     return
 
@@ -387,10 +396,7 @@ class Agency:
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
 
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
-        position = {
-            "x": random.randint(*DAY_CARE_CENTER["x"]),
-            "y": random.randint(*DAY_CARE_CENTER["y"]),
-        }
+        position = DAY_CARE_CENTER.random_point()
         await pet.update(position)
         pet.is_in_day_care_center = True
         return None

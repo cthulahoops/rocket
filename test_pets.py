@@ -200,7 +200,7 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
 
     location_update = await session.get_request()
     new_position = location_update.json["bot"]
-    assert pets.in_region(new_position, pets.DAY_CARE_CENTER)
+    assert new_position in pets.DAY_CARE_CENTER
 
     await asyncio.sleep(1)
     assert not session.pending_requests()
@@ -262,13 +262,13 @@ async def test_corral(owned_cat):
     assert await updates.__anext__() == {"x": 2, "y": 3}
 
     corral_move = await updates.__anext__()
-    assert pets.in_region(corral_move, pets.CORRAL)
+    assert corral_move in pets.CORRAL
 
     await pet.update({"x": 8, "y": 9})
     assert await updates.__anext__() == {"x": 8, "y": 9}
 
     corral_move = await updates.__anext__()
-    assert pets.in_region(corral_move, pets.CORRAL)
+    assert corral_move in pets.CORRAL
 
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
