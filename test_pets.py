@@ -45,6 +45,10 @@ class MockSession:
         assert message_text[: len(mention)] == mention
         return message_text[len(mention) :]
 
+    async def moved_to(self):
+        request = await self.get_request()
+        return request.json["bot"]
+
 
 @pytest.fixture(name="genie")
 def genie_fixture():
@@ -151,8 +155,7 @@ async def test_successful_adoption(genie, rocket, person):
         json={"bot": {"name": f"{person['person_name']}'s rocket"}},
     )
 
-    location_update = await session.get_request()
-    assert pets.is_adjacent(person["pos"], location_update.json["bot"])
+    assert pets.is_adjacent(person["pos"], await session.moved_to())
 
 
 @pytest.mark.asyncio
@@ -187,9 +190,7 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
 
     assert await session.message_received(owned_cat, person) == "miaow!"
 
-    location_update = await session.get_request()
-    new_position = location_update.json["bot"]
-    assert new_position in pets.DAY_CARE_CENTER
+    assert await session.moved_to() in pets.DAY_CARE_CENTER
 
     await asyncio.sleep(1)
     assert not session.pending_requests()
@@ -206,8 +207,7 @@ async def test_successful_day_care_pick_up(genie, in_day_care_unicorn, person):
 
     assert await session.message_received(in_day_care_unicorn, person) == "✨"
 
-    location_update = await session.get_request()
-    assert pets.is_adjacent(person["pos"], location_update.json["bot"])
+    assert pets.is_adjacent(person["pos"], await session.moved_to())
 
 
 @pytest.mark.asyncio
@@ -233,8 +233,7 @@ async def test_follow_owner(genie, owned_cat, person):
         person["pos"] = {"x": 50, "y": 45}
         await agency.handle_entity(person)
 
-    location_update = await session.get_request()
-    assert pets.is_adjacent(person["pos"], location_update.json["bot"])
+    assert pets.is_adjacent(person["pos"], await session.moved_to())
 
 
 @pytest.mark.asyncio
