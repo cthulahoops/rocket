@@ -42,6 +42,9 @@ class Region:
             "y": random.randint(self.top_left["y"], self.bottom_right["y"]),
         }
 
+    def __repr__(self):
+        return f"<Region {self.top_left!r} {self.bottom_right!r}>"
+
 
 PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
