@@ -221,6 +221,7 @@ class Agency:
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = dict()
         self.processed_message_dt = datetime.datetime.utcnow()
+        self.bot_locations = dict()
 
     async def __aenter__(self):
         return self
@@ -464,8 +465,11 @@ class Agency:
 
         for owner in self.owned_pets:
             for pet in self.owned_pets[owner]:
-                if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
-                    self.lured_pets.add(pet.id)
+                if (
+                    is_adjacent(petter["pos"], self.bot_locations[pet.id])
+                    and pet.type == pet_type
+                ):
+                    self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
                     self.lured_pets_by_petter[petter["id"]].append(pet)
 
     @response_handler(commands, r"help")
@@ -529,6 +533,9 @@ class Agency:
                 position = offset_position(entity["pos"], random.choice(DELTAS))
                 print(f"Moving {pet} to {position}")
                 await pet.update(position)
+
+        if entity["type"] == "Bot":
+            self.bot_locations[entity["id"]] = entity["pos"]
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
