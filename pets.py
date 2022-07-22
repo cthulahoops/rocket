@@ -168,11 +168,13 @@ async def reset_agency():
 class Pet(Bot):
     def __init__(self, bot_json, *a, **k):
         super().__init__(bot_json, *a, **k)
+        self.is_in_day_care_center = False
         if bot_json.get("message"):
             self.owner = bot_json["message"]["mentioned_entity_ids"][0]
+            if "forget" in bot_json["message"]["text"]:
+                self.is_in_day_care_center = True
         else:
             self.owner = None
-        self.is_in_day_care_center = bot_json.get("is_in_day_care_center", False)
 
     @property
     def type(self):
@@ -398,7 +400,7 @@ class Agency:
                 return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
 
-        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
+        await self.send_message(adopter, "Please don't forget about me!", pet)
         position = DAY_CARE_CENTER.random_point()
         await pet.update(position)
         pet.is_in_day_care_center = True
