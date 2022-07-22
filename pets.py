@@ -5,6 +5,7 @@ import datetime
 from collections import defaultdict
 import logging
 import asyncio
+import time
 
 import rctogether
 from bot import Bot
@@ -96,6 +97,7 @@ SPAWN_POINTS = [
 CORRAL = Region({"x": 0, "y": 40}, {"x": 19, "y": 58})
 
 PET_BOREDOM_TIMES = (3600, 5400)
+LURE_TIME_SECONDS = 600
 DAY_CARE_CENTER = Region({"x": 0, "y": 62}, {"x": 11, "y": 74})
 
 SAD_MESSAGE_TEMPLATES = [
@@ -217,7 +219,7 @@ class Agency:
         self.available_pets = available_pets
         self.owned_pets = owned_pets
         self.lured_pets_by_petter = defaultdict(list)
-        self.lured_pets = set()
+        self.lured_pets = dict()
         self.processed_message_dt = datetime.datetime.utcnow()
 
     async def __aenter__(self):
@@ -507,8 +509,22 @@ class Agency:
             for pet in self.owned_pets.get(entity["id"], []):
                 if pet.is_in_day_care_center:
                     continue
+                print(f"Working on {pet}")
                 if pet.id in self.lured_pets:
-                    continue
+                    print(f"The pet {pet} is in self.lured_pets")
+                    if self.lured_pets[pet.id] < time.time():  # if timer is expired
+                        print(
+                            f"The pet {pet} is in self.lured_pets and timer is expired"
+                        )
+                        del self.lured_pets[pet.id]
+                        for petter_id in self.lured_pets_by_petter:
+                            for lured_pet in self.lured_pets_by_petter[petter_id]:
+                                if lured_pet.id == pet.id:
+                                    self.lured_pets_by_petter[petter_id].remove(
+                                        lured_pet
+                                    )
+                    else:
+                        continue
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
                 print(f"Moving {pet} to {position}")
