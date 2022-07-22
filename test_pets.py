@@ -293,6 +293,7 @@ async def test_unowned_pets_dont_escape(rocket):
 @pytest.mark.asyncio
 async def test_pet_a_pet(genie, owned_cat, petless_person, person):
     session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = 600
 
     async with await pets.Agency.create(session) as agency:
         petless_person["pos"] = {"x": 1, "y": 2}  # Cat is at 1,1 - this is adjacent.
@@ -309,3 +310,27 @@ async def test_pet_a_pet(genie, owned_cat, petless_person, person):
 
     location_update = await session.get_request()
     assert pets.is_adjacent(petless_person["pos"], location_update.json["bot"])
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = -1
+
+    async with await pets.Agency.create(session) as agency:
+        petless_person["pos"] = {"x": 1, "y": 2}  # Cat is at 1,1 - this is adjacent.
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should not be ignored: timer is expired
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+    location_update = await session.get_request()
+    assert pets.is_adjacent(person["pos"], location_update.json["bot"])
