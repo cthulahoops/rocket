@@ -213,15 +213,15 @@ class Agency:
 
     commands = []
 
-    def __init__(self, session, genie, available_pets, owned_pets):
+    def __init__(self, session, genie, pets_by_id, available_pets, owned_pets):
         self.session = session
         self.genie = genie
+        self.pets_by_id = pets_by_id
         self.available_pets = available_pets
         self.owned_pets = owned_pets
         self.lured_pets_by_petter = defaultdict(list)
-        self.lured_pets = dict()
+        self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
-        self.bot_locations = dict()
 
     async def __aenter__(self):
         return self
@@ -234,6 +234,7 @@ class Agency:
         genie = None
         available_pets = {}
         owned_pets = defaultdict(list)
+        pets_by_id = {}
 
         for bot_json in await rctogether.bots.get(session):
 
@@ -243,6 +244,8 @@ class Agency:
                 print("Found the genie: ", bot_json)
             else:
                 pet = Pet(bot_json)
+
+                pets_by_id[pet.id] = pet
 
                 if pet.owner:
                     owned_pets[pet.owner].append(pet)
@@ -261,7 +264,7 @@ class Agency:
                 can_be_mentioned=True,
             )
 
-        agency = cls(session, genie, available_pets, owned_pets)
+        agency = cls(session, genie, pets_by_id, available_pets, owned_pets)
         return agency
 
     async def close(self):
@@ -278,7 +281,9 @@ class Agency:
     async def restock_inventory(self):
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_pets:
-                self.available_pets[position_tuple(pos)] = await self.spawn_pet(pos)
+                pet = await self.spawn_pet(pos)
+                self.pets_by_id[pet.id] = pet
+                self.available_pets[position_tuple(pos)] = pet
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
@@ -465,10 +470,7 @@ class Agency:
 
         for owner in self.owned_pets:
             for pet in self.owned_pets[owner]:
-                if (
-                    is_adjacent(petter["pos"], self.bot_locations[pet.id])
-                    and pet.type == pet_type
-                ):
+                if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
                     self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
                     self.lured_pets_by_petter[petter["id"]].append(pet)
 
@@ -535,7 +537,9 @@ class Agency:
                 await pet.update(position)
 
         if entity["type"] == "Bot":
-            self.bot_locations[entity["id"]] = entity["pos"]
+            pet = self.pets_by_id.get(entity["id"])
+            if pet:
+                pet.pos = entity["pos"]
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
