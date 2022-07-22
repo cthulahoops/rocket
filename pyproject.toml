@@ -6,7 +6,7 @@ authors = ["Adam Kelly <adam@cthulahoops.org>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-rctogether = "^0.3.0"
+rctogether = "^0.3.3"
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"
