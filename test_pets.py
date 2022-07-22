@@ -52,7 +52,13 @@ class MockSession:
 
 @pytest.fixture(name="genie")
 def genie_fixture():
-    return {"type": "Bot", "id": 1, "emoji": "🧞", "name": "Unit Genie"}
+    return {
+        "type": "Bot",
+        "id": 1,
+        "emoji": "🧞",
+        "name": "Unit Genie",
+        "pos": {"x": -7, "y": -9},
+    }
 
 
 @pytest.fixture(name="rocket")
@@ -317,8 +323,36 @@ async def test_pet_a_pet(genie, owned_cat, petless_person, person):
         person["pos"] = {"x": 99, "y": 99}
         await agency.handle_entity(person)
 
-    location_update = await session.get_request()
-    assert pets.is_adjacent(petless_person["pos"], location_update.json["bot"])
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(petless_person["pos"], pet_position)
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet_with_pet_move(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = 600
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(
+            {"type": "Bot", "id": owned_cat["id"], "pos": {"x": 99, "y": 108}}
+        )
+        petless_person["pos"] = {
+            "x": 100,
+            "y": 108,
+        }
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should be ignored
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(petless_person["pos"], pet_position)
 
 
 @pytest.mark.asyncio
@@ -341,5 +375,5 @@ async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
         petless_person["pos"] = {"x": 21, "y": 30}
         await agency.handle_entity(petless_person)
 
-    location_update = await session.get_request()
-    assert pets.is_adjacent(person["pos"], location_update.json["bot"])
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(person["pos"], pet_position)
