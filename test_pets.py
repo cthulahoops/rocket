@@ -94,7 +94,10 @@ def owned_cat_fixture(person):
         "name": "Faker McFaceface's cat",
         "emoji": "🐈",
         "pos": {"x": 1, "y": 1},
-        "message": {"mentioned_entity_ids": [person["id"]], "text": "@**Faker McFaceface** miaow!"},
+        "message": {
+            "mentioned_entity_ids": [person["id"]],
+            "text": "@**Faker McFaceface** miaow!",
+        },
     }
 
 
@@ -106,7 +109,10 @@ def in_day_care_unicorn_fixture(person):
         "name": "Faker McFaceface's unicorn",
         "emoji": "🦄",
         "pos": {"x": 6, "y": 70},
-        "message": {"mentioned_entity_ids": [person["id"]], "text": "@**Faker McFaceface** please don't forget about me!"},
+        "message": {
+            "mentioned_entity_ids": [person["id"]],
+            "text": "@**Faker McFaceface** please don't forget about me!",
+        },
     }
 
 
@@ -197,7 +203,10 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
         person["pos"] = {"x": 50, "y": 45}
         await agency.handle_entity(person)
 
-    assert await session.message_received(owned_cat, person) == "Please don't forget about me!"
+    assert (
+        await session.message_received(owned_cat, person)
+        == "Please don't forget about me!"
+    )
 
     assert await session.moved_to() in pets.DAY_CARE_CENTER
 
