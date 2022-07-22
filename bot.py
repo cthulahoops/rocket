@@ -10,6 +10,7 @@ class Bot:
     def __init__(self, bot_json):
         self.bot_json = bot_json
         self.queue = asyncio.Queue()
+        self.pos = bot_json["pos"]
         self.task = None
 
     @classmethod
@@ -27,10 +28,6 @@ class Bot:
 
     def start_task(self, session):
         self.task = asyncio.create_task(self.run(session))
-
-    @property
-    def pos(self):
-        return self.bot_json["pos"]
 
     @property
     def id(self):
