@@ -504,7 +504,7 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            for pet in self.lured_pets_by_petter.get(entity['id'], []):
+            for pet in self.lured_pets_by_petter.get(entity["id"], []):
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
                 print(f"Moving {pet} to {position}")
@@ -513,16 +513,20 @@ class Agency:
             for pet in self.owned_pets.get(entity["id"], []):
                 if pet.is_in_day_care_center:
                     continue
-                print(f'Working on {pet}')
+                print(f"Working on {pet}")
                 if pet.id in self.lured_pets:
-                    print(f'The pet {pet} is in self.lured_pets')
-                    if self.lured_pets[pet.id] < time.time(): # if timer is expired
-                        print(f'The pet {pet} is in self.lured_pets and timer is expired')
+                    print(f"The pet {pet} is in self.lured_pets")
+                    if self.lured_pets[pet.id] < time.time():  # if timer is expired
+                        print(
+                            f"The pet {pet} is in self.lured_pets and timer is expired"
+                        )
                         del self.lured_pets[pet.id]
                         for petter_id in self.lured_pets_by_petter:
                             for lured_pet in self.lured_pets_by_petter[petter_id]:
                                 if lured_pet.id == pet.id:
-                                    self.lured_pets_by_petter[petter_id].remove(lured_pet)
+                                    self.lured_pets_by_petter[petter_id].remove(
+                                        lured_pet
+                                    )
                     else:
                         continue
                 print(entity)
