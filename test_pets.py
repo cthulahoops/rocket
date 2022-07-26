@@ -52,7 +52,13 @@ class MockSession:
 
 @pytest.fixture(name="genie")
 def genie_fixture():
-    return {"type": "Bot", "id": 1, "emoji": "🧞", "name": "Unit Genie"}
+    return {
+        "type": "Bot",
+        "id": 1,
+        "emoji": "🧞",
+        "name": "Unit Genie",
+        "pos": {"x": -7, "y": -9},
+    }
 
 
 @pytest.fixture(name="rocket")
@@ -76,6 +82,16 @@ def person_fixture():
     }
 
 
+@pytest.fixture(name="petless_person")
+def petless_person_fixture():
+    return {
+        "type": "Avatar",
+        "id": 81,
+        "person_name": "Petless McPetface",
+        "pos": {"x": 20, "y": 20},
+    }
+
+
 @pytest.fixture(name="owned_cat")
 def owned_cat_fixture(person):
     return {
@@ -84,7 +100,10 @@ def owned_cat_fixture(person):
         "name": "Faker McFaceface's cat",
         "emoji": "🐈",
         "pos": {"x": 1, "y": 1},
-        "message": {"mentioned_entity_ids": [person["id"]], "text": "@**Faker McFaceface** miaow!"},
+        "message": {
+            "mentioned_entity_ids": [person["id"]],
+            "text": "@**Faker McFaceface** miaow!",
+        },
     }
 
 
@@ -96,7 +115,10 @@ def in_day_care_unicorn_fixture(person):
         "name": "Faker McFaceface's unicorn",
         "emoji": "🦄",
         "pos": {"x": 6, "y": 70},
-        "message": {"mentioned_entity_ids": [person["id"]], "text": "@**Faker McFaceface** please don't forget about me!"},
+        "message": {
+            "mentioned_entity_ids": [person["id"]],
+            "text": "@**Faker McFaceface** please don't forget about me!",
+        },
     }
 
 
@@ -187,7 +209,10 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
         person["pos"] = {"x": 50, "y": 45}
         await agency.handle_entity(person)
 
-    assert await session.message_received(owned_cat, person) == "Please don't forget about me!"
+    assert (
+        await session.message_received(owned_cat, person)
+        == "Please don't forget about me!"
+    )
 
     assert await session.moved_to() in pets.DAY_CARE_CENTER
 
@@ -278,3 +303,77 @@ async def test_unowned_pets_dont_escape(rocket):
     await pet.update(None)
     with pytest.raises(StopAsyncIteration):
         await updates.__anext__()
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = 600
+
+    async with await pets.Agency.create(session) as agency:
+        petless_person["pos"] = {"x": 1, "y": 2}  # Cat is at 1,1 - this is adjacent.
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should be ignored
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(petless_person["pos"], pet_position)
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet_with_pet_move(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = 600
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(
+            {"type": "Bot", "id": owned_cat["id"], "pos": {"x": 99, "y": 108}}
+        )
+        petless_person["pos"] = {
+            "x": 100,
+            "y": 108,
+        }
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should be ignored
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(petless_person["pos"], pet_position)
+
+
+@pytest.mark.asyncio
+async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+    pets.LURE_TIME_SECONDS = -1
+
+    async with await pets.Agency.create(session) as agency:
+        petless_person["pos"] = {"x": 1, "y": 2}  # Cat is at 1,1 - this is adjacent.
+        await agency.handle_entity(petless_person)
+        await agency.handle_entity(
+            incoming_message(petless_person, genie, "Pet the cat!")
+        )
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+        # Rightful owner should not be ignored: timer is expired
+        person["pos"] = {"x": 99, "y": 99}
+        await agency.handle_entity(person)
+        petless_person["pos"] = {"x": 21, "y": 30}
+        await agency.handle_entity(petless_person)
+
+    pet_position = await session.moved_to()
+    assert pets.is_adjacent(person["pos"], pet_position)

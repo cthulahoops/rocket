@@ -5,6 +5,7 @@ import datetime
 from collections import defaultdict
 import logging
 import asyncio
+import time
 
 import rctogether
 from bot import Bot
@@ -96,6 +97,7 @@ SPAWN_POINTS = [
 CORRAL = Region({"x": 0, "y": 40}, {"x": 19, "y": 58})
 
 PET_BOREDOM_TIMES = (3600, 5400)
+LURE_TIME_SECONDS = 600
 DAY_CARE_CENTER = Region({"x": 0, "y": 62}, {"x": 11, "y": 74})
 
 SAD_MESSAGE_TEMPLATES = [
@@ -211,11 +213,14 @@ class Agency:
 
     commands = []
 
-    def __init__(self, session, genie, available_pets, owned_pets):
+    def __init__(self, session, genie, pets_by_id, available_pets, owned_pets):
         self.session = session
         self.genie = genie
+        self.pets_by_id = pets_by_id
         self.available_pets = available_pets
         self.owned_pets = owned_pets
+        self.lured_pets_by_petter = defaultdict(list)
+        self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
 
     async def __aenter__(self):
@@ -229,6 +234,7 @@ class Agency:
         genie = None
         available_pets = {}
         owned_pets = defaultdict(list)
+        pets_by_id = {}
 
         for bot_json in await rctogether.bots.get(session):
 
@@ -238,6 +244,8 @@ class Agency:
                 print("Found the genie: ", bot_json)
             else:
                 pet = Pet(bot_json)
+
+                pets_by_id[pet.id] = pet
 
                 if pet.owner:
                     owned_pets[pet.owner].append(pet)
@@ -256,7 +264,7 @@ class Agency:
                 can_be_mentioned=True,
             )
 
-        agency = cls(session, genie, available_pets, owned_pets)
+        agency = cls(session, genie, pets_by_id, available_pets, owned_pets)
         return agency
 
     async def close(self):
@@ -273,7 +281,9 @@ class Agency:
     async def restock_inventory(self):
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_pets:
-                self.available_pets[position_tuple(pos)] = await self.spawn_pet(pos)
+                pet = await self.spawn_pet(pos)
+                self.pets_by_id[pet.id] = pet
+                self.available_pets[position_tuple(pos)] = pet
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
@@ -450,6 +460,20 @@ class Agency:
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
+    @response_handler(commands, r"pet the ([A-Za-z-]+)")
+    async def handle_pet_a_pet(self, petter, match):
+        # For the moment this command needs to be addressed to the genie (maybe won't later).
+        # Find any pets next to the speaker of the right type.
+        #  Do we have any pets of the right type next to the speaker?
+
+        pet_type = match.group(1)
+
+        for owner in self.owned_pets:
+            for pet in self.owned_pets[owner]:
+                if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
+                    self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
+                    self.lured_pets_by_petter[petter["id"]].append(pet)
+
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
@@ -482,13 +506,40 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            for pet in self.owned_pets.get(entity["id"], []):
-                if pet.is_in_day_care_center:
-                    continue
+            for pet in self.lured_pets_by_petter.get(entity["id"], []):
                 print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
                 print(f"Moving {pet} to {position}")
                 await pet.update(position)
+
+            for pet in self.owned_pets.get(entity["id"], []):
+                if pet.is_in_day_care_center:
+                    continue
+                print(f"Working on {pet}")
+                if pet.id in self.lured_pets:
+                    print(f"The pet {pet} is in self.lured_pets")
+                    if self.lured_pets[pet.id] < time.time():  # if timer is expired
+                        print(
+                            f"The pet {pet} is in self.lured_pets and timer is expired"
+                        )
+                        del self.lured_pets[pet.id]
+                        for petter_id in self.lured_pets_by_petter:
+                            for lured_pet in self.lured_pets_by_petter[petter_id]:
+                                if lured_pet.id == pet.id:
+                                    self.lured_pets_by_petter[petter_id].remove(
+                                        lured_pet
+                                    )
+                    else:
+                        continue
+                print(entity)
+                position = offset_position(entity["pos"], random.choice(DELTAS))
+                print(f"Moving {pet} to {position}")
+                await pet.update(position)
+
+        if entity["type"] == "Bot":
+            pet = self.pets_by_id.get(entity["id"])
+            if pet:
+                pet.pos = entity["pos"]
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
