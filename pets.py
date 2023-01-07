@@ -20,6 +20,10 @@ def parse_position(position):
     return {"x": int(x), "y": int(y)}
 
 
+def position_tuple(pos):
+    return (pos["x"], pos["y"])
+
+
 def offset_position(position, delta):
     return {"x": position["x"] + delta["x"], "y": position["y"] + delta["y"]}
 
@@ -92,10 +96,10 @@ NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
 GENIE_NAME = os.environ.get("GENIE_NAME", "Pet Agency Genie")
 GENIE_HOME = parse_position(os.environ.get("GENIE_HOME", "60,15"))
-SPAWN_POINTS = [
-    offset_position(GENIE_HOME, {"x": dx, "y": dy})
+SPAWN_POINTS = {
+    position_tuple(offset_position(GENIE_HOME, {"x": dx, "y": dy}))
     for (dx, dy) in [(-2, -2), (0, -2), (2, -2), (-2, 0), (2, 0), (0, 2), (2, 2)]
-]
+}
 
 CORRAL = Region({"x": 0, "y": 40}, {"x": 19, "y": 58})
 
@@ -146,10 +150,6 @@ def a_an(noun):
     if noun[0] in "AaEeIiOoUu":
         return "an " + noun
     return "a " + noun
-
-
-def position_tuple(pos):
-    return (pos["x"], pos["y"])
 
 
 def response_handler(commands, pattern):
@@ -233,6 +233,9 @@ class PetDirectory:
     def available(self):
         return self.available_pets.values()
 
+    def empty_spawn_points(self):
+        return SPAWN_POINTS - set(self.available_pets.keys())
+
     def owned(self, owner_id):
         return self.owned_pets[owner_id]
 
@@ -280,9 +283,9 @@ class Agency:
         self.processed_message_dt = datetime.datetime.utcnow()
         self.restock_time = time.time()
 
-    @property
-    def available_pets(self):
-        return self.pet_directory.available_pets
+    # @property
+    # def available_pets(self):
+    #     return self.pet_directory.available_pets
 
     async def __aenter__(self):
         return self
@@ -332,10 +335,9 @@ class Agency:
             if pet:
                 await self.despawn_available_pet(pet)
 
-        for pos in SPAWN_POINTS:
-            if position_tuple(pos) not in self.available_pets:
-                pet = await self.spawn_pet(pos)
-                self.pet_directory.add(pet)
+        for pos in self.pet_directory.empty_spawn_points():
+            pet = await self.spawn_pet(pos)
+            self.pet_directory.add(pet)
 
     async def despawn_available_pet(self, pet):
         self.pet_directory.remove(pet)
@@ -353,8 +355,8 @@ class Agency:
             self.session,
             name=pet["name"],
             emoji=pet["emoji"],
-            x=pos["x"],
-            y=pos["y"],
+            x=pos[0],
+            y=pos[1],
         )
 
     def get_random(self):
