@@ -251,6 +251,11 @@ class PetDirectory:
             for pet in pet_collection:
                 yield pet
 
+    def set_owner(self, pet, owner):
+        self.remove(pet)
+        pet.owner = owner["id"]
+        self.add(pet)
+
 
 class Agency:
     """
@@ -437,9 +442,8 @@ class Agency:
             pet.id,
             {"name": f"{adopter['person_name']}'s {pet.name}"},
         )
-        del self.available_pets[position_tuple(pet.bot_json["pos"])]
-        self.owned_pets[adopter["id"]].append(pet)
-        pet.owner = adopter["id"]
+
+        self.pet_directory.set_owner(pet, adopter)
 
         return None
 
