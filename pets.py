@@ -251,6 +251,9 @@ class PetDirectory:
             for pet in pet_collection:
                 yield pet
 
+    def __getitem__(self, pet_id):
+        return self.pets_by_id[pet_id]
+
     def set_owner(self, pet, owner):
         self.remove(pet)
         pet.owner = owner["id"]
@@ -280,10 +283,6 @@ class Agency:
     @property
     def available_pets(self):
         return self.pet_directory.available_pets
-
-    @property
-    def pets_by_id(self):
-        return self.pet_directory.pets_by_id
 
     async def __aenter__(self):
         return self
@@ -584,7 +583,7 @@ class Agency:
                 await pet.update(position)
 
         if entity["type"] == "Bot":
-            pet = self.pets_by_id.get(entity["id"])
+            pet = self.pet_directory[entity["id"]]
             if pet:
                 pet.pos = entity["pos"]
 
