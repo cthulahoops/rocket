@@ -233,8 +233,8 @@ class PetDirectory:
     def available(self):
         return self.available_pets.values()
 
-    def owned(self, owner):
-        return self.owned_pets[owner]
+    def owned(self, owner_id):
+        return self.owned_pets[owner_id]
 
     def pop_owned_by_type(self, pet_name, owner):
         for pet in self.owned_pets[owner["id"]]:
@@ -276,10 +276,6 @@ class Agency:
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
         self.restock_time = time.time()
-
-    @property
-    def owned_pets(self):
-        return self.pet_directory.owned_pets
 
     @property
     def available_pets(self):
@@ -379,7 +375,9 @@ class Agency:
 
     def get_random_from_day_care_center(self, owner):
         pets_in_day_care = [
-            pet for pet in self.owned_pets[owner["id"]] if pet.is_in_day_care_center
+            pet
+            for pet in self.pet_directory.owned(owner["id"])
+            if pet.is_in_day_care_center
         ]
         if not pets_in_day_care:
             return None
@@ -517,8 +515,8 @@ class Agency:
 
         pet_type = match.group(1)
 
-        for owner in self.owned_pets:
-            for pet in self.owned_pets[owner]:
+        for owner in self.pet_directory.owned_pets:
+            for pet in self.pet_directory.owned_pets[owner]:
                 if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
                     self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
                     self.lured_pets_by_petter[petter["id"]].append(pet)
@@ -561,7 +559,7 @@ class Agency:
                 print(f"Moving {pet} to {position}")
                 await pet.update(position)
 
-            for pet in self.owned_pets.get(entity["id"], []):
+            for pet in self.pet_directory.owned(entity["id"]):
                 if pet.is_in_day_care_center:
                     continue
                 print(f"Working on {pet}")
