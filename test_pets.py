@@ -106,12 +106,13 @@ def petless_person_fixture():
 
 @pytest.fixture(name="available_hippo")
 def available_hippo_fixture():
+    spawn_point = list(pets.SPAWN_POINTS)[0]
     return {
         "type": "Bot",
         "id": 123,
         "name": "hippo",
         "emoji": "🦛",
-        "pos": pets.SPAWN_POINTS[0],
+        "pos": {"x": spawn_point[0], "y": spawn_point[1]},
     }
 
 
