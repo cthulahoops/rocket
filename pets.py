@@ -227,9 +227,6 @@ class PetDirectory:
         else:
             del self.available_pets[position_tuple(pet.pos)]
 
-    def oldest_available_pet(self):
-        return min(self.available_pets.values(), key=lambda pet: pet.id, default=None)
-
     def available(self):
         return self.available_pets.values()
 
@@ -238,13 +235,6 @@ class PetDirectory:
 
     def owned(self, owner_id):
         return self.owned_pets[owner_id]
-
-    def pop_owned_by_type(self, pet_name, owner):
-        for pet in self.owned_pets[owner["id"]]:
-            if pet.type == pet_name:
-                self.owned_pets[owner["id"]].remove(pet)
-                return pet
-        return None
 
     def __iter__(self):
         for pet in self.available_pets.values():
@@ -282,10 +272,6 @@ class Agency:
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
         self.restock_time = time.time()
-
-    # @property
-    # def available_pets(self):
-    #     return self.pet_directory.available_pets
 
     async def __aenter__(self):
         return self
@@ -331,7 +317,9 @@ class Agency:
     async def restock_inventory(self):
         if True or time.time() - self.restock_time > ONE_DAY:
             self.restock_time = time.time()
-            pet = self.pet_directory.oldest_available_pet()
+            pet = min(
+                self.pet_directory.available(), key=lambda pet: pet.id, default=None
+            )
             if pet:
                 await self.despawn_available_pet(pet)
 
@@ -486,7 +474,14 @@ class Agency:
     @response_handler(commands, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
         pet_name = match.groups()[0]
-        pet = self.pet_directory.pop_owned_by_type(pet_name, adopter)
+        pet = next(
+            (
+                pet
+                for pet in self.pet_directory.owned(adopter["id"])
+                if pet.type == pet_name
+            ),
+            None,
+        )
 
         if not pet:
             try:
@@ -494,6 +489,8 @@ class Agency:
             except IndexError:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
             return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
+
+        self.pet_directory.remove(pet)
 
         # There may be unhandled updates in the pet's message queue - they don't matter because the exceptions will just be logged.
         # To be more correct we could push a delete event through the pet's queue.
