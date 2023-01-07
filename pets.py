@@ -207,45 +207,48 @@ class Pet(Bot):
 
 class PetDirectory:
     def __init__(self):
-        self.available_pets = {}
-        self.owned_pets = defaultdict(list)
-        self.pets_by_id = {}
+        self._available_pets = {}
+        self._owned_pets = defaultdict(list)
+        self._pets_by_id = {}
 
     def add(self, pet):
-        self.pets_by_id[pet.id] = pet
+        self._pets_by_id[pet.id] = pet
 
         if pet.owner:
-            self.owned_pets[pet.owner].append(pet)
+            self._owned_pets[pet.owner].append(pet)
         else:
-            self.available_pets[position_tuple(pet.pos)] = pet
+            self._available_pets[position_tuple(pet.pos)] = pet
 
     def remove(self, pet):
-        del self.pets_by_id[pet.id]
+        del self._pets_by_id[pet.id]
 
         if pet.owner:
-            self.owned_pets[pet.owner].remove(pet)
+            self._owned_pets[pet.owner].remove(pet)
         else:
-            del self.available_pets[position_tuple(pet.pos)]
+            del self._available_pets[position_tuple(pet.pos)]
 
     def available(self):
-        return self.available_pets.values()
+        return self._available_pets.values()
 
     def empty_spawn_points(self):
-        return SPAWN_POINTS - set(self.available_pets.keys())
+        return SPAWN_POINTS - set(self._available_pets.keys())
 
     def owned(self, owner_id):
-        return self.owned_pets[owner_id]
+        return self._owned_pets[owner_id]
 
     def __iter__(self):
-        for pet in self.available_pets.values():
+        for pet in self._available_pets.values():
             yield pet
 
-        for pet_collection in self.owned_pets.values():
+        yield from self.all_owned()
+
+    def all_owned(self):
+        for pet_collection in self._owned_pets.values():
             for pet in pet_collection:
                 yield pet
 
     def __getitem__(self, pet_id):
-        return self.pets_by_id[pet_id]
+        return self._pets_by_id[pet_id]
 
     def set_owner(self, pet, owner):
         self.remove(pet)
@@ -513,11 +516,10 @@ class Agency:
 
         pet_type = match.group(1)
 
-        for owner in self.pet_directory.owned_pets:
-            for pet in self.pet_directory.owned_pets[owner]:
-                if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
-                    self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
-                    self.lured_pets_by_petter[petter["id"]].append(pet)
+        for pet in self.pet_directory.all_owned():
+            if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
+                self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
+                self.lured_pets_by_petter[petter["id"]].append(pet)
 
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
