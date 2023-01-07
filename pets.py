@@ -12,6 +12,8 @@ from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
 
+ONE_DAY = 60 * 60 * 24
+
 
 def parse_position(position):
     x, y = position.split(",")
@@ -203,6 +205,53 @@ class Pet(Bot):
                     return
 
 
+class PetDirectory:
+    def __init__(self):
+        self.available_pets = {}
+        self.owned_pets = defaultdict(list)
+        self.pets_by_id = {}
+
+    def add(self, pet):
+        self.pets_by_id[pet.id] = pet
+
+        if pet.owner:
+            self.owned_pets[pet.owner].append(pet)
+        else:
+            self.available_pets[position_tuple(pet.pos)] = pet
+
+    def remove(self, pet):
+        del self.pets_by_id[pet.id]
+
+        if pet.owner:
+            self.owned_pets[pet.owner].remove(pet)
+        else:
+            del self.available_pets[position_tuple(pet.pos)]
+
+    def oldest_available_pet(self):
+        return min(self.available_pets.values(), key=lambda pet: pet.id, default=None)
+
+    def available(self):
+        return self.available_pets.values()
+
+    def owned(self, owner):
+        return self.owned_pets[owner]
+
+    def pop_owned_by_type(self, pet_name, owner):
+        for pet in self.owned_pets[owner["id"]]:
+            if pet.type == pet_name:
+                self.owned_pets[owner["id"]].remove(pet)
+                return pet
+        return None
+
+    def __iter__(self):
+        for pet in self.available_pets.values():
+            yield pet
+
+        for pet_collection in self.owned_pets.values():
+            for pet in pet_collection:
+                yield pet
+
+
 class Agency:
     """
     public interface:
@@ -214,15 +263,26 @@ class Agency:
 
     commands = []
 
-    def __init__(self, session, genie, pets_by_id, available_pets, owned_pets):
+    def __init__(self, session, genie, pet_directory):
         self.session = session
         self.genie = genie
-        self.pets_by_id = pets_by_id
-        self.available_pets = available_pets
-        self.owned_pets = owned_pets
+        self.pet_directory = pet_directory
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
+        self.restock_time = time.time()
+
+    @property
+    def owned_pets(self):
+        return self.pet_directory.owned_pets
+
+    @property
+    def available_pets(self):
+        return self.pet_directory.available_pets
+
+    @property
+    def pets_by_id(self):
+        return self.pet_directory.pets_by_id
 
     async def __aenter__(self):
         return self
@@ -233,26 +293,16 @@ class Agency:
     @classmethod
     async def create(cls, session):
         genie = None
-        available_pets = {}
-        owned_pets = defaultdict(list)
-        pets_by_id = {}
+        pet_directory = PetDirectory()
 
         for bot_json in await rctogether.bots.get(session):
-
             if bot_json["emoji"] == "🧞":
                 genie = Bot(bot_json)
                 genie.start_task(session)
                 print("Found the genie: ", bot_json)
             else:
                 pet = Pet(bot_json)
-
-                pets_by_id[pet.id] = pet
-
-                if pet.owner:
-                    owned_pets[pet.owner].append(pet)
-                else:
-                    available_pets[position_tuple(bot_json["pos"])] = pet
-
+                pet_directory.add(pet)
                 pet.start_task(session)
 
         if not genie:
@@ -265,30 +315,38 @@ class Agency:
                 can_be_mentioned=True,
             )
 
-        agency = cls(session, genie, pets_by_id, available_pets, owned_pets)
+        agency = cls(session, genie, pet_directory)
         return agency
 
     async def close(self):
         if self.genie:
             await self.genie.close()
 
-        for pet in self.available_pets.values():
+        for pet in self.pet_directory:
             await pet.close()
 
-        for pet_collection in self.owned_pets.values():
-            for pet in pet_collection:
-                await pet.close()
-
     async def restock_inventory(self):
+        if True or time.time() - self.restock_time > ONE_DAY:
+            self.restock_time = time.time()
+            pet = self.pet_directory.oldest_available_pet()
+            if pet:
+                await self.despawn_available_pet(pet)
+
         for pos in SPAWN_POINTS:
             if position_tuple(pos) not in self.available_pets:
                 pet = await self.spawn_pet(pos)
-                self.pets_by_id[pet.id] = pet
-                self.available_pets[position_tuple(pos)] = pet
+                self.pet_directory.add(pet)
+
+    async def despawn_available_pet(self, pet):
+        self.pet_directory.remove(pet)
+        await pet.close()
+        # Let the world know that this pet is gone?
+        # await self.send_message(adopter, sad_message(pet_name), pet)
+        await rctogether.bots.delete(self.session, pet.id)
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
-        while self.available(pet["emoji"]):
+        while any(x.emoji == pet for x in self.pet_directory.available()):
             pet = random.choice(PETS)
 
         return await Pet.create(
@@ -299,33 +357,17 @@ class Agency:
             y=pos["y"],
         )
 
-    def available(self, pet):
-        return any(x.emoji == pet for x in self.available_pets.values())
-
-    def get_by_name(self, pet_name):
-        for pet in self.available_pets.values():
-            if pet.name == pet_name:
-                return pet
-        return None
-
     def get_random(self):
         return random.choice(list(self.available_pets.values()))
 
-    def pop_owned_by_type(self, pet_name, owner):
-        for pet in self.owned_pets[owner["id"]]:
-            if pet.type == pet_name:
-                self.owned_pets[owner["id"]].remove(pet)
-                return pet
-        return None
-
     def get_non_day_care_center_owned_by_type(self, pet_name, owner):
-        for pet in self.owned_pets[owner["id"]]:
+        for pet in self.pet_directory.owned(owner["id"]):
             if pet.type == pet_name and not pet.is_in_day_care_center:
                 return pet
         return None
 
     def get_from_day_care_center_by_type(self, pet_name, owner):
-        for pet in self.owned_pets[owner["id"]]:
+        for pet in self.pet_directory.owned(owner["id"]):
             if pet.type == pet_name and pet.is_in_day_care_center:
                 return pet
         return None
@@ -338,11 +380,8 @@ class Agency:
             return None
         return random.choice(pets_in_day_care)
 
-    def random_available_pet(self):
-        return random.choice(list(self.available_pets.values()))
-
     def random_owned(self, owner):
-        return random.choice(self.owned_pets[owner["id"]])
+        return random.choice(self.pet_directory.owned(owner))
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
@@ -377,11 +416,16 @@ class Agency:
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
         else:
-            pet = self.get_by_name(pet_name)
+            pet = next(
+                filter(
+                    lambda pet: pet.name == pet_name, self.pet_directory.available()
+                ),
+                None,
+            )
 
         if not pet:
             try:
-                alternative = self.random_available_pet().name
+                alternative = random.choice(list(self.pet_directory.available())).name
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
 
@@ -439,7 +483,7 @@ class Agency:
     @response_handler(commands, r"abandon my ([A-Za-z-]+)")
     async def handle_abandonment(self, adopter, match):
         pet_name = match.groups()[0]
-        pet = self.pop_owned_by_type(pet_name, adopter)
+        pet = self.pet_directory.pop_owned_by_type(pet_name, adopter)
 
         if not pet:
             try:

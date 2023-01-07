@@ -1,5 +1,6 @@
 from collections import namedtuple
 import asyncio
+import itertools
 
 import pytest
 
@@ -17,11 +18,22 @@ class MockSession:
     def __init__(self, get_data):
         self._queue = asyncio.Queue()
         self.get_data = get_data
+        self.ids = itertools.count(9999)
 
     async def get(self, path):
         return self.get_data[path]
 
     async def post(self, path, json):
+        print("POST: ", path, json)
+        if path == "bots":
+            bot_json = json["bot"]
+            return {
+                "name": bot_json["name"],
+                "id": next(self.ids),
+                "emoji": bot_json["emoji"],
+                "pos": {"x": bot_json["x"], "y": bot_json["y"]},
+                "direction": bot_json["direction"],
+            }
         await self._queue.put(Request("post", path, None, json))
 
     async def patch(self, path, bot_id, json):
@@ -89,6 +101,17 @@ def petless_person_fixture():
         "id": 81,
         "person_name": "Petless McPetface",
         "pos": {"x": 20, "y": 20},
+    }
+
+
+@pytest.fixture(name="available_hippo")
+def available_hippo_fixture():
+    return {
+        "type": "Bot",
+        "id": 123,
+        "name": "hippo",
+        "emoji": "🦛",
+        "pos": pets.SPAWN_POINTS[0],
     }
 
 
@@ -377,3 +400,18 @@ async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
 
     pet_position = await session.moved_to()
     assert pets.is_adjacent(person["pos"], pet_position)
+
+
+@pytest.mark.asyncio
+async def test_restock(genie, person, available_hippo):
+    session = MockSession({"bots": [genie, available_hippo]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
+
+    request = await session.get_request()
+    assert request == Request(
+        method="delete", path="bots", id=available_hippo["id"], json=None
+    )
+
+    assert await session.message_received(genie, person) == "New pets now in stock!"
