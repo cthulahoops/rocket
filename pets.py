@@ -350,9 +350,6 @@ class Agency:
             y=pos[1],
         )
 
-    def get_random(self):
-        return random.choice(list(self.available_pets.values()))
-
     def get_non_day_care_center_owned_by_type(self, pet_name, owner):
         for pet in self.pet_directory.owned(owner["id"]):
             if pet.type == pet_name and not pet.is_in_day_care_center:
@@ -407,7 +404,7 @@ class Agency:
 
         if pet_name == "pet":
             try:
-                pet = self.get_random()
+                pet = random.choice(list(self.pet_directory.available()))
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
         else:
