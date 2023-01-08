@@ -314,18 +314,6 @@ class Agency:
         for pet in self.pet_directory:
             await pet.close()
 
-    async def restock_inventory(self):
-        if self.pet_directory.empty_spawn_points():
-            pet = min(
-                self.pet_directory.available(), key=lambda pet: pet.id, default=None
-            )
-            if pet:
-                await self.despawn_available_pet(pet)
-
-        for pos in self.pet_directory.empty_spawn_points():
-            pet = await self.spawn_pet(pos)
-            self.pet_directory.add(pet)
-
     async def despawn_available_pet(self, pet):
         self.pet_directory.remove(pet)
         await pet.close()
@@ -379,7 +367,16 @@ class Agency:
 
     @response_handler(commands, "time to restock")
     async def handle_restock(self, adopter, match):
-        await self.restock_inventory()
+        if self.pet_directory.empty_spawn_points():
+            pet = min(
+                self.pet_directory.available(), key=lambda pet: pet.id, default=None
+            )
+            if pet:
+                await self.despawn_available_pet(pet)
+
+        for pos in self.pet_directory.empty_spawn_points():
+            pet = await self.spawn_pet(pos)
+            self.pet_directory.add(pet)
         return "New pets now in stock!"
 
     @response_handler(commands, "adopt (a|an|the|one)? ([A-Za-z-]+)")
