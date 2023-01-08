@@ -585,8 +585,11 @@ class Agency:
                 await pet.update(position)
 
         if entity["type"] == "Bot":
-            pet = self.pet_directory[entity["id"]]
-            if pet:
+            try:
+                pet = self.pet_directory[entity["id"]]
+            except KeyError:
+                pass
+            else:
                 pet.pos = entity["pos"]
 
 

@@ -343,6 +343,13 @@ async def test_follow_owner(genie, owned_cat, person):
 
 
 @pytest.mark.asyncio
+async def test_ignores_unrelated_other(genie, owned_cat):
+    session = MockSession({"bots": [genie]})
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(owned_cat)
+
+
+@pytest.mark.asyncio
 async def test_corral(owned_cat):
     pet = pets.Pet(owned_cat)
 
