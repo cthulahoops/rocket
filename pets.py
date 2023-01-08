@@ -547,29 +547,20 @@ class Agency:
                 message_dt = datetime.datetime.strptime(
                     message["sent_at"], "%Y-%m-%dT%H:%M:%SZ"
                 )
-                if message_dt <= self.processed_message_dt:
-                    print("Skipping old message: ", message)
-                else:
+                if message_dt > self.processed_message_dt:
                     await self.handle_mention(entity, message)
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
             for pet in self.lured_pets_by_petter.get(entity["id"], []):
-                print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
-                print(f"Moving {pet} to {position}")
                 await pet.update(position)
 
             for pet in self.pet_directory.owned(entity["id"]):
                 if pet.is_in_day_care_center:
                     continue
-                print(f"Working on {pet}")
                 if pet.id in self.lured_pets:
-                    print(f"The pet {pet} is in self.lured_pets")
                     if self.lured_pets[pet.id] < time.time():  # if timer is expired
-                        print(
-                            f"The pet {pet} is in self.lured_pets and timer is expired"
-                        )
                         del self.lured_pets[pet.id]
                         for petter_id in self.lured_pets_by_petter:
                             for lured_pet in self.lured_pets_by_petter[petter_id]:
@@ -579,9 +570,7 @@ class Agency:
                                     )
                     else:
                         continue
-                print(entity)
                 position = offset_position(entity["pos"], random.choice(DELTAS))
-                print(f"Moving {pet} to {position}")
                 await pet.update(position)
 
         if entity["type"] == "Bot":
