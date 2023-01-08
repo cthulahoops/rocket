@@ -246,6 +246,21 @@ async def test_successful_abandonment(genie, owned_cat, person):
 
 
 @pytest.mark.asyncio
+async def test_unsuccessful_abandonment(genie, owned_cat, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(
+            incoming_message(person, genie, "I wish to heartlessly abandon my owl!")
+        )
+
+    assert (
+        await session.message_received(genie, person)
+        == "Sorry, you don't have an owl. Would you like to abandon your cat instead?"
+    )
+
+
+@pytest.mark.asyncio
 async def test_successful_day_care_drop_off(genie, owned_cat, person):
     session = MockSession({"bots": [genie, owned_cat]})
 
