@@ -462,7 +462,7 @@ async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
 
 
 @pytest.mark.asyncio
-async def test_restock(genie, person):
+async def test_restock_from_empty(genie, person):
     session = MockSession({"bots": [genie]})
 
     async with await pets.Agency.create(session) as agency:
@@ -482,6 +482,10 @@ async def test_restock_partial(genie, person, available_pets):
     request = await session.get_request()
     assert request == Request(
         method="delete", path="bots", id=available_pets[0]["id"], json=None
+    )
+    assert (
+        await session.message_received(genie, person)
+        == "A bat was unwanted and has been sent to the farm."
     )
 
     assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)

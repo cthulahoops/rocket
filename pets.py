@@ -158,6 +158,10 @@ def a_an(noun):
     return "a " + noun
 
 
+def upfirst(text):
+    return text[0].upper() + text[1:]
+
+
 def response_handler(commands, pattern):
     def decorator(f):
         commands.append((pattern, f))
@@ -322,13 +326,6 @@ class Agency:
         for pet in self.pet_directory:
             await pet.close()
 
-    async def despawn_available_pet(self, pet):
-        self.pet_directory.remove(pet)
-        await pet.close()
-        # Let the world know that this pet is gone?
-        # await self.send_message(adopter, sad_message(pet_name), pet)
-        await rctogether.bots.delete(self.session, pet.id)
-
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
         while any(x.emoji == pet for x in self.pet_directory.available()):
@@ -374,13 +371,19 @@ class Agency:
         )
 
     @response_handler(commands, "time to restock")
-    async def handle_restock(self, adopter, match):
+    async def handle_restock(self, restocker, match):
         if self.pet_directory.empty_spawn_points():
             pet = min(
                 self.pet_directory.available(), key=lambda pet: pet.id, default=None
             )
             if pet:
-                await self.despawn_available_pet(pet)
+                self.pet_directory.remove(pet)
+                await pet.close()
+                await rctogether.bots.delete(self.session, pet.id)
+                await self.send_message(
+                    restocker,
+                    f"{upfirst(a_an(pet.name))} was unwanted and has been sent to the farm.",
+                )
 
         for pos in self.pet_directory.empty_spawn_points():
             pet = await self.spawn_pet(pos)
