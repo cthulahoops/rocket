@@ -12,8 +12,6 @@ from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
 
-ONE_DAY = 60 * 60 * 24
-
 
 def parse_position(position):
     x, y = position.split(",")
@@ -274,7 +272,6 @@ class Agency:
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
-        self.restock_time = time.time()
 
     async def __aenter__(self):
         return self
@@ -318,8 +315,7 @@ class Agency:
             await pet.close()
 
     async def restock_inventory(self):
-        if True or time.time() - self.restock_time > ONE_DAY:
-            self.restock_time = time.time()
+        if self.pet_directory.empty_spawn_points():
             pet = min(
                 self.pet_directory.available(), key=lambda pet: pet.id, default=None
             )

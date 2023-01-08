@@ -104,16 +104,21 @@ def petless_person_fixture():
     }
 
 
-@pytest.fixture(name="available_hippo")
-def available_hippo_fixture():
+@pytest.fixture(name="available_pets")
+def available_pets_fixture():
     spawn_point = list(pets.SPAWN_POINTS)[0]
-    return {
-        "type": "Bot",
-        "id": 123,
-        "name": "hippo",
-        "emoji": "🦛",
-        "pos": {"x": spawn_point[0], "y": spawn_point[1]},
-    }
+    return [
+        {
+            "type": "Bot",
+            "id": pet_id,
+            "name": pet["name"],
+            "emoji": pet["emoji"],
+            "pos": {"x": spawn_point[0], "y": spawn_point[1]},
+        }
+        for (pet_id, pet, spawn_point) in zip(
+            itertools.count(800), pets.PETS, pets.SPAWN_POINTS
+        )
+    ]
 
 
 @pytest.fixture(name="owned_cat")
@@ -457,15 +462,38 @@ async def test_pet_a_pet_expired(genie, owned_cat, petless_person, person):
 
 
 @pytest.mark.asyncio
-async def test_restock(genie, person, available_hippo):
-    session = MockSession({"bots": [genie, available_hippo]})
+async def test_restock(genie, person):
+    session = MockSession({"bots": [genie]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
+
+    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
+    assert await session.message_received(genie, person) == "New pets now in stock!"
+
+
+@pytest.mark.asyncio
+async def test_restock_partial(genie, person, available_pets):
+    session = MockSession({"bots": [genie] + available_pets[:4]})
 
     async with await pets.Agency.create(session) as agency:
         await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
 
     request = await session.get_request()
     assert request == Request(
-        method="delete", path="bots", id=available_hippo["id"], json=None
+        method="delete", path="bots", id=available_pets[0]["id"], json=None
     )
 
+    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
+    assert await session.message_received(genie, person) == "New pets now in stock!"
+
+
+@pytest.mark.asyncio
+async def test_restock_full(genie, person, available_pets):
+    session = MockSession({"bots": [genie] + available_pets})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
+
+    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
     assert await session.message_received(genie, person) == "New pets now in stock!"
