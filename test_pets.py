@@ -497,3 +497,69 @@ async def test_restock_full(genie, person, available_pets):
 
     assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
     assert await session.message_received(genie, person) == "New pets now in stock!"
+
+
+@pytest.mark.asyncio
+async def test_genie_autospawn():
+    session = MockSession({"bots": []})
+
+    async with await pets.Agency.create(session) as agency:
+        pass
+
+    assert agency.genie.name == "Pet Agency Genie"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "message,response",
+    [
+        ("help me!", pets.HELP_TEXT),
+        (
+            "adopt the unicorn now, you stupid genie",
+            "No please? Our pets are only available to polite homes.",
+        ),
+        (
+            "adopt the unicorn, please",
+            "Sorry, we don't have any pets at the moment, perhaps it's time to restock?",
+        ),
+        (
+            "adopt the horse, please",
+            "Sorry, that's just a picture of a horse.",
+        ),
+        ("adopt the genie, please", "You can't adopt me. I'm not a pet!"),
+        (
+            "adopt the apatosaurus, please",
+            "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?",
+        ),
+        (
+            "adopt a pet, please",
+            "Sorry, we don't have any pets at the moment, perhaps it's time to restock?",
+        ),
+        (
+            "fire rocket at my friends",
+            "Sorry, I don't understand. Would you like to adopt a pet?",
+        ),
+        (
+            "abandon my owl, please",
+            "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?",
+        ),
+        (
+            "drop off my snail, please",
+            "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?",
+        ),
+        (
+            "pick up my snail, please",
+            "Sorry, you have no pets in day care. Would you like to drop one off?",
+        ),
+        ("That's a well-actually.", "Oh, you're right. Sorry!"),
+    ],
+)
+async def test_basic_messages_user_with_no_pets(
+    genie, petless_person, owned_cat, message, response
+):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(incoming_message(petless_person, genie, message))
+
+    assert await session.message_received(genie, petless_person) == response

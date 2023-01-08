@@ -2,6 +2,8 @@ import os
 import random
 import re
 import datetime
+import textwrap
+
 from collections import defaultdict
 import logging
 import asyncio
@@ -50,6 +52,12 @@ class Region:
     def __repr__(self):
         return f"<Region {self.top_left!r} {self.bottom_right!r}>"
 
+
+HELP_TEXT = textwrap.dedent(
+    """\
+        I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'.
+        The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
+)
 
 PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
@@ -513,7 +521,7 @@ class Agency:
 
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
-        return """I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'. The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
+        return HELP_TEXT
 
     async def handle_mention(self, adopter, message):
         for (pattern, handler) in self.commands:
