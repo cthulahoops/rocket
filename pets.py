@@ -373,7 +373,7 @@ class Agency:
         return random.choice(pets_in_day_care)
 
     def random_owned(self, owner):
-        return random.choice(self.pet_directory.owned(owner))
+        return random.choice(self.pet_directory.owned(owner["id"]))
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
