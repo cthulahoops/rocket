@@ -283,6 +283,21 @@ async def test_successful_day_care_drop_off(genie, owned_cat, person):
 
 
 @pytest.mark.asyncio
+async def test_unsuccessful_day_care_drop_off(genie, owned_cat, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(
+            incoming_message(person, genie, "Please look after my unicorn!")
+        )
+
+    assert (
+        await session.message_received(genie, person)
+        == "Sorry, you don't have a unicorn. Would you like to drop off your cat instead?"
+    )
+
+
+@pytest.mark.asyncio
 async def test_successful_day_care_pick_up(genie, in_day_care_unicorn, person):
     session = MockSession({"bots": [genie, in_day_care_unicorn]})
 
