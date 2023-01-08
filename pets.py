@@ -162,9 +162,9 @@ def upfirst(text):
     return text[0].upper() + text[1:]
 
 
-def response_handler(commands, pattern):
+def response_handler(commands, pattern, include_mentions=False):
     def decorator(f):
-        commands.append((pattern, f))
+        commands.append((pattern, f, include_mentions))
         return f
 
     return decorator
@@ -284,6 +284,7 @@ class Agency:
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
+        self.avatars = {}
 
     async def __aenter__(self):
         return self
@@ -522,15 +523,61 @@ class Agency:
                 self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
                 self.lured_pets_by_petter[petter["id"]].append(pet)
 
+    @response_handler(commands, r"give my ([A-Za-z]+) to", include_mentions=True)
+    async def handle_give_pet(self, giver, match, mentioned_entities):
+        pet_name = match.group(1)
+        pet = next(
+            (
+                pet
+                for pet in self.pet_directory.owned(giver["id"])
+                if pet.type == pet_name
+            ),
+            None,
+        )
+
+        if not pet:
+            try:
+                suggested_alternative = self.random_owned(giver).type
+            except IndexError:
+                return "Sorry, you don't have any pets to give away, perhaps you'd like to adopt one?"
+            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to give your {suggested_alternative} instead?"
+
+        if not mentioned_entities:
+            return f"Who to you want to give your {pet_name} to?"
+        recipient = self.avatars.get(mentioned_entities[0])
+
+        if not recipient:
+            return "Sorry, I don't know who that is! (Are they online?)"
+
+        await self.send_message(recipient, NOISES.get(pet.emoji, "💖"), pet)
+        await rctogether.bots.update(
+            self.session,
+            pet.id,
+            {"name": f"{recipient['person_name']}'s {pet.name}"},
+        )
+
+        self.pet_directory.set_owner(pet, recipient)
+        position = offset_position(recipient["pos"], random.choice(DELTAS))
+        await pet.update(position)
+        return
+
     @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return HELP_TEXT
 
-    async def handle_mention(self, adopter, message):
-        for (pattern, handler) in self.commands:
+    async def handle_mention(self, adopter, message, mentioned_entity_ids):
+        for (pattern, handler, include_mentions) in self.commands:
             match = re.search(pattern, message["text"], re.IGNORECASE)
             if match:
-                response = await handler(self, adopter, match)
+                if include_mentions:
+                    response = await handler(
+                        self,
+                        adopter,
+                        match,
+                        [x for x in mentioned_entity_ids if x != self.genie.id],
+                    )
+                else:
+                    response = await handler(self, adopter, match)
                 if response:
                     await self.send_message(adopter, response)
                 return
@@ -541,6 +588,8 @@ class Agency:
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
+            self.avatars[entity["id"]] = entity
+
             message = entity.get("message")
 
             if message and self.genie.id in message["mentioned_entity_ids"]:
@@ -548,7 +597,9 @@ class Agency:
                     message["sent_at"], "%Y-%m-%dT%H:%M:%SZ"
                 )
                 if message_dt > self.processed_message_dt:
-                    await self.handle_mention(entity, message)
+                    await self.handle_mention(
+                        entity, message, message["mentioned_entity_ids"]
+                    )
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":

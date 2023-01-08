@@ -151,9 +151,13 @@ def in_day_care_unicorn_fixture(person):
     }
 
 
-def incoming_message(sender, recipient, message):
+def incoming_message(sender, recipients, message):
+    if isinstance(recipients, dict):
+        recipients = [recipients]
+    recipients = [recipient["id"] for recipient in recipients]
+
     sender["message"] = {
-        "mentioned_entity_ids": [recipient["id"]],
+        "mentioned_entity_ids": recipients,
         "sent_at": "2037-12-31T23:59:59Z",  # More reasonable sent_at.
         "text": message,
     }
@@ -511,6 +515,61 @@ async def test_restock_full(genie, person, available_pets):
 
 
 @pytest.mark.asyncio
+async def test_successful_give_pet(genie, person, petless_person, owned_cat):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        # Send preliminary message to make sure the agency knows about the recipient.
+        await agency.handle_entity(
+            incoming_message(
+                petless_person, [person], "Hi, could I borrow your cat, please?"
+            )
+        )
+
+        await agency.handle_entity(
+            incoming_message(
+                person, [genie, petless_person], "Give my cat to @**Petless Person**!"
+            )
+        )
+
+    assert (
+        await session.message_received(owned_cat, petless_person)
+        == pets.NOISES[owned_cat["emoji"]]
+    )
+    request = await session.get_request()
+
+    assert request == Request(
+        method="patch",
+        path="bots",
+        id=owned_cat["id"],
+        json={
+            "bot": {"name": f"{petless_person['person_name']}'s {owned_cat['name']}"}
+        },
+    )
+
+    assert pets.is_adjacent(petless_person["pos"], await session.moved_to())
+
+
+@pytest.mark.asyncio
+async def test_unsuccessful_give_pet(genie, person, petless_person, owned_cat):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity(
+            incoming_message(
+                person,
+                [genie, petless_person],
+                "Give my owl to @**Petless Person**!",
+            )
+        )
+
+    assert (
+        await session.message_received(genie, person)
+        == "Sorry, you don't have an owl. Would you like to give your cat instead?"
+    )
+
+
+@pytest.mark.asyncio
 async def test_genie_autospawn():
     session = MockSession({"bots": []})
 
@@ -563,6 +622,10 @@ async def test_genie_autospawn():
             "Sorry, you have no pets in day care. Would you like to drop one off?",
         ),
         ("That's a well-actually.", "Oh, you're right. Sorry!"),
+        (
+            "give my parrot to bob",
+            "Sorry, you don't have any pets to give away, perhaps you'd like to adopt one?",
+        ),
     ],
 )
 async def test_basic_messages_user_with_no_pets(
