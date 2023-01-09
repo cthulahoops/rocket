@@ -329,7 +329,7 @@ class Agency:
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
-        while any(x.emoji == pet for x in self.pet_directory.available()):
+        while any(x.emoji == pet["emoji"] for x in self.pet_directory.available()):
             pet = random.choice(PETS)
 
         return await Pet.create(
