@@ -61,6 +61,7 @@ HELP_TEXT = textwrap.dedent(
 
 PETS = [
     {"emoji": "🦇", "name": "bat", "noise": "screech!"},
+    {"emoji": "🐻", "name": "bear", "noise": "ROAR!"},
     {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
     {"emoji": "🦕", "name": "brontosaurus", "noise": "MEEEHHH!"},
     {"emoji": "🐫", "name": "camel"},
