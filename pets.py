@@ -432,7 +432,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{adopter['person_name']}'s {pet.name}"},
+            {"name": f"{adopter['person_name']}'s {pet.type}"},
         )
 
         self.pet_directory.set_owner(pet, adopter)
@@ -553,7 +553,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{recipient['person_name']}'s {pet.name}"},
+            {"name": f"{recipient['person_name']}'s {pet.type}"},
         )
 
         self.pet_directory.set_owner(pet, recipient)

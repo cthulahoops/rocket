@@ -543,7 +543,7 @@ async def test_successful_give_pet(genie, person, petless_person, owned_cat):
         path="bots",
         id=owned_cat["id"],
         json={
-            "bot": {"name": f"{petless_person['person_name']}'s {owned_cat['name']}"}
+            "bot": {"name": f"{petless_person['person_name']}'s cat"}
         },
     )
 
