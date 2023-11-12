@@ -126,12 +126,12 @@ def owned_cat_fixture(person):
     return {
         "type": "Bot",
         "id": 39887,
-        "name": "Faker McFaceface's cat",
+        "name": "Faker McFakeface's cat",
         "emoji": "🐈",
         "pos": {"x": 1, "y": 1},
         "message": {
             "mentioned_entity_ids": [person["id"]],
-            "text": "@**Faker McFaceface** miaow!",
+            "text": "@**Faker McFakeface** miaow!",
         },
     }
 
@@ -141,12 +141,12 @@ def in_day_care_unicorn_fixture(person):
     return {
         "type": "Bot",
         "id": 987,
-        "name": "Faker McFaceface's unicorn",
+        "name": "Faker McFakeface's unicorn",
         "emoji": "🦄",
         "pos": {"x": 6, "y": 70},
         "message": {
             "mentioned_entity_ids": [person["id"]],
-            "text": "@**Faker McFaceface** please don't forget about me!",
+            "text": "@**Faker McFakeface** please don't forget about me!",
         },
     }
 
