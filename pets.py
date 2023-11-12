@@ -196,6 +196,7 @@ class Pet(Bot):
     def type(self):
         return self.name.split(" ")[-1]
 
+
     async def queued_updates(self):
         updates = super().queued_updates()
 
@@ -215,6 +216,8 @@ class Pet(Bot):
                 except StopAsyncIteration:
                     return
 
+def owned_pet_name(owner, pet):
+    return f"{owner['person_name']}'s {pet.type}"
 
 class PetDirectory:
     def __init__(self):
@@ -433,7 +436,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{adopter['person_name']}'s {pet.type}"},
+            {"name": owned_pet_name(adopter, pet)},
         )
 
         self.pet_directory.set_owner(pet, adopter)
@@ -554,7 +557,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{recipient['person_name']}'s {pet.type}"},
+            {"name": owned_pet_name(recipient, pet)},
         )
 
         self.pet_directory.set_owner(pet, recipient)
@@ -604,26 +607,8 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            for pet in self.lured_pets_by_petter.get(entity["id"], []):
-                position = offset_position(entity["pos"], random.choice(DELTAS))
-                await pet.update(position)
-
-            for pet in self.pet_directory.owned(entity["id"]):
-                if pet.is_in_day_care_center:
-                    continue
-                if pet.id in self.lured_pets:
-                    if self.lured_pets[pet.id] < time.time():  # if timer is expired
-                        del self.lured_pets[pet.id]
-                        for petter_id in self.lured_pets_by_petter:
-                            for lured_pet in self.lured_pets_by_petter[petter_id]:
-                                if lured_pet.id == pet.id:
-                                    self.lured_pets_by_petter[petter_id].remove(
-                                        lured_pet
-                                    )
-                    else:
-                        continue
-                position = offset_position(entity["pos"], random.choice(DELTAS))
-                await pet.update(position)
+            for pet, update in self.handle_avatar_move(entity):
+                await pet.update(update)
 
         if entity["type"] == "Bot":
             try:
@@ -632,6 +617,42 @@ class Agency:
                 pass
             else:
                 pet.pos = entity["pos"]
+
+
+    def check_lured(self, pet):
+        if pet.id not in self.lured_pets:
+            return False
+
+        if self.lured_pets[pet.id] < time.time():  # if timer is expired
+            del self.lured_pets[pet.id]
+            for petter_id in self.lured_pets_by_petter:
+                for lured_pet in self.lured_pets_by_petter[petter_id]:
+                    if lured_pet.id == pet.id:
+                        self.lured_pets_by_petter[petter_id].remove(
+                            lured_pet
+                        )
+            return False
+
+        return True
+
+    def handle_avatar_move(self, entity):
+        for pet in self.lured_pets_by_petter.get(entity["id"], []):
+            position = offset_position(entity["pos"], random.choice(DELTAS))
+            yield pet, position
+
+        for pet in self.pet_directory.owned(entity["id"]):
+            if pet.is_in_day_care_center or self.check_lured(pet):
+                pet_update = {}
+            else:
+                pet_update = offset_position(entity["pos"], random.choice(DELTAS))
+
+            # Handle possible name change.
+            pet_name = owned_pet_name(entity, pet)
+            if pet.name != pet_name:
+                pet_update["name"] = pet_name
+
+            if pet_update:
+                yield pet, pet_update
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]

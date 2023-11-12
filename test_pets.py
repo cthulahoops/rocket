@@ -126,12 +126,12 @@ def owned_cat_fixture(person):
     return {
         "type": "Bot",
         "id": 39887,
-        "name": "Faker McFaceface's cat",
+        "name": "Faker McFakeface's cat",
         "emoji": "🐈",
         "pos": {"x": 1, "y": 1},
         "message": {
             "mentioned_entity_ids": [person["id"]],
-            "text": "@**Faker McFaceface** miaow!",
+            "text": "@**Faker McFakeface** miaow!",
         },
     }
 
@@ -141,12 +141,12 @@ def in_day_care_unicorn_fixture(person):
     return {
         "type": "Bot",
         "id": 987,
-        "name": "Faker McFaceface's unicorn",
+        "name": "Faker McFakeface's unicorn",
         "emoji": "🦄",
         "pos": {"x": 6, "y": 70},
         "message": {
             "mentioned_entity_ids": [person["id"]],
-            "text": "@**Faker McFaceface** please don't forget about me!",
+            "text": "@**Faker McFakeface** please don't forget about me!",
         },
     }
 
@@ -344,6 +344,30 @@ async def test_follow_owner(genie, owned_cat, person):
         await agency.handle_entity(person)
 
     assert pets.is_adjacent(person["pos"], await session.moved_to())
+
+
+@pytest.mark.asyncio
+async def test_owner_changes_name(genie, owned_cat, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        person["person_name"] = "Eve Newname"
+        await agency.handle_entity(person)
+
+    updated_pet = await session.moved_to()
+    assert updated_pet["name"] == "Eve Newname's cat"
+
+
+@pytest.mark.asyncio
+async def test_owner_changes_name_during_day_care(genie, in_day_care_unicorn, person):
+    session = MockSession({"bots": [genie, in_day_care_unicorn]})
+
+    async with await pets.Agency.create(session) as agency:
+        person["person_name"] = "Eve Newname"
+        await agency.handle_entity(person)
+
+    updated_pet = await session.moved_to()
+    assert updated_pet["name"] == "Eve Newname's unicorn"
 
 
 @pytest.mark.asyncio
