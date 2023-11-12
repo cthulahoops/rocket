@@ -617,6 +617,23 @@ class Agency:
             else:
                 pet.pos = entity["pos"]
 
+
+    def check_lured(self, pet):
+        if pet.id not in self.lured_pets:
+            return False
+
+        if self.lured_pets[pet.id] < time.time():  # if timer is expired
+            del self.lured_pets[pet.id]
+            for petter_id in self.lured_pets_by_petter:
+                for lured_pet in self.lured_pets_by_petter[petter_id]:
+                    if lured_pet.id == pet.id:
+                        self.lured_pets_by_petter[petter_id].remove(
+                            lured_pet
+                        )
+            return False
+
+        return True
+
     async def handle_avatar_move(self, entity):
         for pet in self.lured_pets_by_petter.get(entity["id"], []):
             position = offset_position(entity["pos"], random.choice(DELTAS))
@@ -625,17 +642,9 @@ class Agency:
         for pet in self.pet_directory.owned(entity["id"]):
             if pet.is_in_day_care_center:
                 continue
-            if pet.id in self.lured_pets:
-                if self.lured_pets[pet.id] < time.time():  # if timer is expired
-                    del self.lured_pets[pet.id]
-                    for petter_id in self.lured_pets_by_petter:
-                        for lured_pet in self.lured_pets_by_petter[petter_id]:
-                            if lured_pet.id == pet.id:
-                                self.lured_pets_by_petter[petter_id].remove(
-                                    lured_pet
-                                )
-                else:
-                    continue
+
+            if self.check_lured(pet):
+                continue
 
             pet_update = offset_position(entity["pos"], random.choice(DELTAS))
 
