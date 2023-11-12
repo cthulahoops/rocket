@@ -196,6 +196,12 @@ class Pet(Bot):
     def type(self):
         return self.name.split(" ")[-1]
 
+
+    @property
+    def owner_name(self):
+        return self.name.split("'s ")[0]
+
+
     async def queued_updates(self):
         updates = super().queued_updates()
 
@@ -622,8 +628,13 @@ class Agency:
                                     )
                     else:
                         continue
-                position = offset_position(entity["pos"], random.choice(DELTAS))
-                await pet.update(position)
+
+                pet_update = offset_position(entity["pos"], random.choice(DELTAS))
+
+                if pet.owner_name != entity["person_name"]:
+                    pet_update['name'] = f"{entity['person_name']}'s {pet.type}"
+
+                await pet.update(pet_update)
 
         if entity["type"] == "Bot":
             try:
