@@ -197,11 +197,6 @@ class Pet(Bot):
         return self.name.split(" ")[-1]
 
 
-    @property
-    def owner_name(self):
-        return self.name.split("'s ")[0]
-
-
     async def queued_updates(self):
         updates = super().queued_updates()
 
@@ -221,6 +216,8 @@ class Pet(Bot):
                 except StopAsyncIteration:
                     return
 
+def owned_pet_name(owner, pet):
+    return f"{owner['person_name']}'s {pet.type}"
 
 class PetDirectory:
     def __init__(self):
@@ -439,7 +436,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{adopter['person_name']}'s {pet.type}"},
+            {"name": owned_pet_name(adopter, pet)},
         )
 
         self.pet_directory.set_owner(pet, adopter)
@@ -560,7 +557,7 @@ class Agency:
         await rctogether.bots.update(
             self.session,
             pet.id,
-            {"name": f"{recipient['person_name']}'s {pet.type}"},
+            {"name": owned_pet_name(recipient, pet)},
         )
 
         self.pet_directory.set_owner(pet, recipient)
@@ -631,8 +628,10 @@ class Agency:
 
                 pet_update = offset_position(entity["pos"], random.choice(DELTAS))
 
-                if pet.owner_name != entity["person_name"]:
-                    pet_update['name'] = f"{entity['person_name']}'s {pet.type}"
+                # Handle possible name change.
+                pet_name = owned_pet_name(entity, pet)
+                if pet.name != pet_name:
+                    pet_update["name"] = pet_name
 
                 await pet.update(pet_update)
 
