@@ -359,6 +359,18 @@ async def test_owner_changes_name(genie, owned_cat, person):
 
 
 @pytest.mark.asyncio
+async def test_owner_changes_name_during_day_care(genie, in_day_care_unicorn, person):
+    session = MockSession({"bots": [genie, in_day_care_unicorn]})
+
+    async with await pets.Agency.create(session) as agency:
+        person["person_name"] = "Eve Newname"
+        await agency.handle_entity(person)
+
+    updated_pet = await session.moved_to()
+    assert updated_pet["name"] == "Eve Newname's unicorn"
+
+
+@pytest.mark.asyncio
 async def test_ignores_unrelated_other(genie, owned_cat):
     session = MockSession({"bots": [genie]})
     async with await pets.Agency.create(session) as agency:

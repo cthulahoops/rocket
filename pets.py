@@ -607,7 +607,8 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            await self.handle_avatar_move(entity)
+            for pet, update in self.handle_avatar_move(entity):
+                await pet.update(update)
 
         if entity["type"] == "Bot":
             try:
@@ -634,26 +635,24 @@ class Agency:
 
         return True
 
-    async def handle_avatar_move(self, entity):
+    def handle_avatar_move(self, entity):
         for pet in self.lured_pets_by_petter.get(entity["id"], []):
             position = offset_position(entity["pos"], random.choice(DELTAS))
-            await pet.update(position)
+            yield pet, position
 
         for pet in self.pet_directory.owned(entity["id"]):
-            if pet.is_in_day_care_center:
-                continue
-
-            if self.check_lured(pet):
-                continue
-
-            pet_update = offset_position(entity["pos"], random.choice(DELTAS))
+            if pet.is_in_day_care_center or self.check_lured(pet):
+                pet_update = {}
+            else:
+                pet_update = offset_position(entity["pos"], random.choice(DELTAS))
 
             # Handle possible name change.
             pet_name = owned_pet_name(entity, pet)
             if pet.name != pet_name:
                 pet_update["name"] = pet_name
 
-            await pet.update(pet_update)
+            if pet_update:
+                yield pet, pet_update
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
