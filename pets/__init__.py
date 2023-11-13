@@ -12,6 +12,7 @@ import rctogether
 from bot import Bot
 
 from .parser import parse_command
+from .update_queues import UpdateQueues
 
 logging.basicConfig(level=logging.INFO)
 
@@ -282,6 +283,8 @@ class Agency:
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
 
+        self._bot_update_queues = UpdateQueues()
+
     async def __aenter__(self):
         return self
 
@@ -316,12 +319,19 @@ class Agency:
         agency = cls(session, genie, pet_directory)
         return agency
 
+    async def update_pet(self, pet, update):
+        await self._bot_update_queues.add_task(
+            pet.id, rctogether.bots.update(self.session, pet.id, update)
+        )
+
     async def close(self):
         if self.genie:
             await self.genie.close()
 
         for pet in self.pet_directory:
             await pet.close()
+
+        await self._bot_update_queues.close()
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
@@ -446,7 +456,7 @@ class Agency:
 
         await self.send_message(adopter, "Please don't forget about me!", pet)
         position = DAY_CARE_CENTER.random_point()
-        await pet.update(position)
+        await self.update_pet(pet, position)
         pet.is_in_day_care_center = True
         return None
 
@@ -543,7 +553,7 @@ class Agency:
 
         self.pet_directory.set_owner(pet, recipient)
         position = offset_position(recipient["pos"], random.choice(DELTAS))
-        await pet.update(position)
+        await self.update_pet(pet, position)
         return
 
     async def handle_help(self, adopter, match):
@@ -592,7 +602,7 @@ class Agency:
 
         if entity["type"] == "Avatar":
             for pet, update in self.handle_avatar_move(entity):
-                await pet.update(update)
+                await self.update_pet(pet, update)
 
         if entity["type"] == "Bot":
             try:
