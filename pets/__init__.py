@@ -601,6 +601,7 @@ class Agency:
                 pass
             else:
                 pet.pos = entity["pos"]
+                pet.bot_json["name"] = entity["name"]
 
     def check_lured(self, pet):
         if pet.id not in self.lured_pets:
