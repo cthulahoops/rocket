@@ -1,6 +1,5 @@
 import os
 import random
-import re
 import datetime
 import textwrap
 
@@ -11,6 +10,8 @@ import time
 
 import rctogether
 from bot import Bot
+
+from .parser import parse_command
 
 logging.basicConfig(level=logging.INFO)
 
@@ -163,14 +164,6 @@ def upfirst(text):
     return text[0].upper() + text[1:]
 
 
-def response_handler(commands, pattern, include_mentions=False):
-    def decorator(f):
-        commands.append((pattern, f, include_mentions))
-        return f
-
-    return decorator
-
-
 async def reset_agency():
     async with rctogether.RestApiSession() as session:
         for bot in await rctogether.bots.get(session):
@@ -196,7 +189,6 @@ class Pet(Bot):
     def type(self):
         return self.name.split(" ")[-1]
 
-
     async def queued_updates(self):
         updates = super().queued_updates()
 
@@ -216,8 +208,10 @@ class Pet(Bot):
                 except StopAsyncIteration:
                     return
 
+
 def owned_pet_name(owner, pet):
     return f"{owner['person_name']}'s {pet.type}"
+
 
 class PetDirectory:
     def __init__(self):
@@ -278,8 +272,6 @@ class Agency:
         handle_entity
             (json_blob)
     """
-
-    commands = []
 
     def __init__(self, session, genie, pet_directory):
         self.session = session
@@ -375,7 +367,6 @@ class Agency:
             self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
 
-    @response_handler(commands, "time to restock")
     async def handle_restock(self, restocker, match):
         if self.pet_directory.empty_spawn_points():
             pet = min(
@@ -395,7 +386,6 @@ class Agency:
             self.pet_directory.add(pet)
         return "New pets now in stock!"
 
-    @response_handler(commands, "adopt (a|an|the|one)? ([A-Za-z-]+)")
     async def handle_adoption(self, adopter, match):
         if not any(please in match.string.lower() for please in MANNERS):
             return "No please? Our pets are only available to polite homes."
@@ -443,7 +433,6 @@ class Agency:
 
         return None
 
-    @response_handler(commands, r"(?:look after|take care of|drop off) my ([A-Za-z]+)")
     async def handle_day_care_drop_off(self, adopter, match):
         pet_name = match.groups()[0]
         pet = self.get_non_day_care_center_owned_by_type(pet_name, adopter)
@@ -461,7 +450,6 @@ class Agency:
         pet.is_in_day_care_center = True
         return None
 
-    @response_handler(commands, r"(?:collect|pick up|get) my ([A-Za-z]+)")
     async def handle_day_care_pick_up(self, adopter, match):
         pet_name = match.groups()[0]
         pet = self.get_from_day_care_center_by_type(pet_name, adopter)
@@ -476,12 +464,10 @@ class Agency:
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         pet.is_in_day_care_center = False
 
-    @response_handler(commands, "thank")
     async def handle_thanks(self, adopter, match):
         return random.choice(THANKS_RESPONSES)
 
-    @response_handler(commands, r"abandon my ([A-Za-z-]+)")
-    async def handle_abandonment(self, adopter, match):
+    async def handle_abandon(self, adopter, match):
         pet_name = match.groups()[0]
         pet = next(
             (
@@ -508,13 +494,9 @@ class Agency:
         await rctogether.bots.delete(self.session, pet.id)
         return None
 
-    @response_handler(
-        commands, r"well[- ]actually|feigning surprise|backseat driving|subtle[- ]*ism"
-    )
     async def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
-    @response_handler(commands, r"pet the ([A-Za-z-]+)")
     async def handle_pet_a_pet(self, petter, match):
         # For the moment this command needs to be addressed to the genie (maybe won't later).
         # Find any pets next to the speaker of the right type.
@@ -527,7 +509,6 @@ class Agency:
                 self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
                 self.lured_pets_by_petter[petter["id"]].append(pet)
 
-    @response_handler(commands, r"give my ([A-Za-z]+) to", include_mentions=True)
     async def handle_give_pet(self, giver, match, mentioned_entities):
         pet_name = match.group(1)
         pet = next(
@@ -565,30 +546,33 @@ class Agency:
         await pet.update(position)
         return
 
-    @response_handler(commands, r"help")
     async def handle_help(self, adopter, match):
         return HELP_TEXT
 
-    async def handle_mention(self, adopter, message, mentioned_entity_ids):
-        for (pattern, handler, include_mentions) in self.commands:
-            match = re.search(pattern, message["text"], re.IGNORECASE)
-            if match:
-                if include_mentions:
-                    response = await handler(
-                        self,
-                        adopter,
-                        match,
-                        [x for x in mentioned_entity_ids if x != self.genie.id],
-                    )
-                else:
-                    response = await handler(self, adopter, match)
-                if response:
-                    await self.send_message(adopter, response)
-                return
+    async def handle_command(self, command, adopter, match, mentioned_entities):
+        handler = getattr(self, f"handle_{command}")
+        if command == "give_pet":
+            return await handler(adopter, match, mentioned_entities)
+        return await handler(adopter, match)
 
-        await self.send_message(
-            adopter, "Sorry, I don't understand. Would you like to adopt a pet?"
+    async def handle_mention(self, adopter, message, mentioned_entity_ids):
+        parsed = parse_command(message["text"])
+
+        if not parsed:
+            await self.send_message(
+                adopter, "Sorry, I don't understand. Would you like to adopt a pet?"
+            )
+            return
+        command, match = parsed
+
+        mentioned_entity_ids = [x for x in mentioned_entity_ids if x != self.genie.id]
+
+        response = await self.handle_command(
+            command, adopter, match, mentioned_entity_ids
         )
+
+        if response:
+            await self.send_message(adopter, response)
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
@@ -617,7 +601,6 @@ class Agency:
                 pass
             else:
                 pet.pos = entity["pos"]
-                pet.bot_json["name"] = entity["name"]
 
     def check_lured(self, pet):
         if pet.id not in self.lured_pets:
