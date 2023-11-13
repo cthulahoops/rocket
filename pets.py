@@ -617,7 +617,7 @@ class Agency:
                 pass
             else:
                 pet.pos = entity["pos"]
-
+                pet.bot_json["name"] = entity["name"]
 
     def check_lured(self, pet):
         if pet.id not in self.lured_pets:
@@ -628,9 +628,7 @@ class Agency:
             for petter_id in self.lured_pets_by_petter:
                 for lured_pet in self.lured_pets_by_petter[petter_id]:
                     if lured_pet.id == pet.id:
-                        self.lured_pets_by_petter[petter_id].remove(
-                            lured_pet
-                        )
+                        self.lured_pets_by_petter[petter_id].remove(lured_pet)
             return False
 
         return True

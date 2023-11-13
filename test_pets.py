@@ -106,7 +106,6 @@ def petless_person_fixture():
 
 @pytest.fixture(name="available_pets")
 def available_pets_fixture():
-    spawn_point = list(pets.SPAWN_POINTS)[0]
     return [
         {
             "type": "Bot",
@@ -359,6 +358,19 @@ async def test_owner_changes_name(genie, owned_cat, person):
 
 
 @pytest.mark.asyncio
+async def test_owner_changes_name_back_again(genie, owned_cat, person):
+    session = MockSession({"bots": [genie, owned_cat]})
+
+    async with await pets.Agency.create(session) as agency:
+        await agency.handle_entity({**owned_cat, "name": "Eve Newname's cat"})
+        person["person_name"] = "Faker McFakeface"
+        await agency.handle_entity(person)
+
+    updated_pet = await session.moved_to()
+    assert updated_pet["name"] == "Faker McFakeface's cat"
+
+
+@pytest.mark.asyncio
 async def test_owner_changes_name_during_day_care(genie, in_day_care_unicorn, person):
     session = MockSession({"bots": [genie, in_day_care_unicorn]})
 
@@ -450,9 +462,7 @@ async def test_pet_a_pet_with_pet_move(genie, owned_cat, petless_person, person)
     pets.LURE_TIME_SECONDS = 600
 
     async with await pets.Agency.create(session) as agency:
-        await agency.handle_entity(
-            {"type": "Bot", "id": owned_cat["id"], "pos": {"x": 99, "y": 108}}
-        )
+        await agency.handle_entity({**owned_cat, "pos": {"x": 99, "y": 108}})
         petless_person["pos"] = {
             "x": 100,
             "y": 108,
@@ -566,9 +576,7 @@ async def test_successful_give_pet(genie, person, petless_person, owned_cat):
         method="patch",
         path="bots",
         id=owned_cat["id"],
-        json={
-            "bot": {"name": f"{petless_person['person_name']}'s cat"}
-        },
+        json={"bot": {"name": f"{petless_person['person_name']}'s cat"}},
     )
 
     assert pets.is_adjacent(petless_person["pos"], await session.moved_to())
