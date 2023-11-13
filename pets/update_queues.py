@@ -1,7 +1,7 @@
 import asyncio
 import rctogether
 
-SLEEP_AFTER_UPDATE = 0.01
+SLEEP_AFTER_UPDATE = 0.1
 
 
 class UpdateQueues:
