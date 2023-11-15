@@ -272,6 +272,8 @@ class PetDirectory:
 class AgencySync:
     def __init__(self, genie, pet_directory):
         self.pet_directory = pet_directory
+        self.lured_pets_by_petter = defaultdict(list)
+        self.lured_pets = {}
 
     def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
@@ -331,6 +333,20 @@ class AgencySync:
     def handle_social_rules(self, adopter, match):
         return "Oh, you're right. Sorry!"
 
+    def handle_pet_a_pet(self, petter, match):
+        # For the moment this command needs to be addressed to the genie (maybe won't later).
+        # Find any pets next to the speaker of the right type.
+        #  Do we have any pets of the right type next to the speaker?
+
+        pet_type = match.group(1)
+
+        for pet in self.pet_directory.all_owned():
+            if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
+                self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
+                self.lured_pets_by_petter[petter["id"]].append(pet)
+
+        return []
+
 
 class Agency:
     """
@@ -345,13 +361,19 @@ class Agency:
         self.session = session
         self.genie = genie
         self.pet_directory = pet_directory
-        self.lured_pets_by_petter = defaultdict(list)
-        self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
         self.agency_sync = AgencySync(genie, pet_directory)
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
+
+    @property
+    def lured_pets(self):
+        return self.agency_sync.lured_pets
+
+    @property
+    def lured_pets_by_petter(self):
+        return self.agency_sync.lured_pets_by_petter
 
     def __getattr__(self, name):
         return self.agency_sync.__getattribute__(name)
@@ -537,18 +559,6 @@ class Agency:
         await self.send_message(adopter, sad_message(pet_name), pet)
         await self.delete_pet(pet)
         return None
-
-    async def handle_pet_a_pet(self, petter, match):
-        # For the moment this command needs to be addressed to the genie (maybe won't later).
-        # Find any pets next to the speaker of the right type.
-        #  Do we have any pets of the right type next to the speaker?
-
-        pet_type = match.group(1)
-
-        for pet in self.pet_directory.all_owned():
-            if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
-                self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
-                self.lured_pets_by_petter[petter["id"]].append(pet)
 
     async def handle_give_pet(self, giver, match, mentioned_entities):
         pet_name = match.group(1)
