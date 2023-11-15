@@ -470,6 +470,15 @@ class AgencySync:
             if pet_update:
                 yield ("update_pet", pet, pet_update)
 
+    def handle_bot(self, entity):
+        try:
+            pet = self.pet_directory[entity["id"]]
+        except KeyError:
+            pass
+        else:
+            pet.pos = entity["pos"]
+            pet.bot_json["name"] = entity["name"]
+
 
 class Agency:
     """
@@ -670,13 +679,7 @@ class Agency:
                 await self.apply_event(event)
 
         if entity["type"] == "Bot":
-            try:
-                pet = self.pet_directory[entity["id"]]
-            except KeyError:
-                pass
-            else:
-                pet.pos = entity["pos"]
-                pet.bot_json["name"] = entity["name"]
+            self.handle_bot(entity)
 
 
 def get_one_by_type(pet_type, pets):
