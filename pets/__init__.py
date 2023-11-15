@@ -211,26 +211,6 @@ class Pet:
         return self.bot_json["name"]
 
 
-#     async def queued_updates(self):
-#         updates = super().queued_updates()
-
-#         while True:
-#             next_update = asyncio.Task(updates.__anext__())
-#             while True:
-#                 try:
-#                     update = await asyncio.wait_for(
-#                         asyncio.shield(next_update),
-#                         timeout=random.randint(*PET_BOREDOM_TIMES),
-#                     )
-#                     yield update
-#                     break
-#                 except asyncio.TimeoutError:
-#                     if self.owner and not self.is_in_day_care_center:
-#                         yield CORRAL.random_point()
-#                 except StopAsyncIteration:
-#                     return
-
-
 def owned_pet_name(owner, pet):
     return f"{owner['person_name']}'s {pet.type}"
 
@@ -280,6 +260,9 @@ class PetDirectory:
     def __getitem__(self, pet_id):
         return self._pets_by_id[pet_id]
 
+    def get(self, pet_id, default=None):
+        return self._pets_by_id.get(pet_id, default)
+
     def set_owner(self, pet, owner):
         self.remove(pet)
         pet.owner = owner["id"]
@@ -304,7 +287,7 @@ class Agency:
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
 
-        self._pet_update_queues = UpdateQueues(update_queues.deduplicated_updates)
+        self._pet_update_queues = UpdateQueues(self.queue_iterator)
 
     async def __aenter__(self):
         return self
@@ -342,6 +325,27 @@ class Agency:
         await self._pet_update_queues.add_task(
             pet.id, rctogether.bots.update(self.session, pet.id, update)
         )
+
+    async def queue_iterator(self, queue, pet_id):
+        pet = self.pet_directory.get(pet_id)
+
+        updates = update_queues.deduplicated_updates(queue)
+
+        while True:
+            next_update = asyncio.Task(updates.__anext__())
+            while True:
+                try:
+                    update = await asyncio.wait_for(
+                        asyncio.shield(next_update),
+                        timeout=random.randint(*PET_BOREDOM_TIMES),
+                    )
+                    yield update
+                    break
+                except asyncio.TimeoutError:
+                    if pet and pet.owner and not pet.is_in_day_care_center:
+                        yield CORRAL.random_point()
+                except StopAsyncIteration:
+                    return
 
     async def delete_pet(self, pet):
         await self._pet_update_queues.add_task(pet.id, None)

@@ -19,7 +19,7 @@ class UpdateQueues:
         await self.queues[queue_id].put(task)
 
     async def run(self, queue_id, queue):
-        async for task in self.queue_iterator(queue):
+        async for task in self.queue_iterator(queue, queue_id):
             try:
                 await task
             except rctogether.api.HttpError as exc:
@@ -48,7 +48,7 @@ async def get_all_available_updates(queue):
     return updates
 
 
-async def deduplicated_updates(queue):
+async def deduplicated_updates(queue, queue_id=None):
     while True:
         updates = await get_all_available_updates(queue)
 
