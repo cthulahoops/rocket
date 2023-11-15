@@ -413,6 +413,29 @@ class AgencySync:
         ]
         return None
 
+    def handle_day_care_pick_up(self, owner, match):
+        pet_type = match.groups()[0]
+
+        pets_in_day_care = [
+            pet
+            for pet in self.pet_directory.owned(owner["id"])
+            if pet.is_in_day_care_center
+        ]
+
+        pet = get_one_by_type(pet_type, pets_in_day_care)
+
+        if not pet:
+            if not pets_in_day_care:
+                return "Sorry, you have no pets in day care. Would you like to drop one off?"
+            suggested_alternative = random.choice(pets_in_day_care).type
+            return f"Sorry, you don't have {a_an(pet_type)} to collect. Would you like to collect your {suggested_alternative} instead?"
+
+        pet.is_in_day_care_center = False
+
+        return [
+            ("send_message", owner, NOISES.get(pet.emoji, "💖"), pet),
+        ]
+
 
 class Agency:
     """
@@ -525,22 +548,6 @@ class Agency:
             y=pos[1],
         )
 
-    def get_from_day_care_center_by_type(self, pet_name, owner):
-        for pet in self.pet_directory.owned(owner["id"]):
-            if pet.type == pet_name and pet.is_in_day_care_center:
-                return pet
-        return None
-
-    def get_random_from_day_care_center(self, owner):
-        pets_in_day_care = [
-            pet
-            for pet in self.pet_directory.owned(owner["id"])
-            if pet.is_in_day_care_center
-        ]
-        if not pets_in_day_care:
-            return None
-        return random.choice(pets_in_day_care)
-
     def random_owned(self, owner):
         return random.choice(self.pet_directory.owned(owner["id"]))
 
@@ -567,20 +574,6 @@ class Agency:
             pet = await self.spawn_pet(pos)
             self.pet_directory.add(pet)
         return "New pets now in stock!"
-
-    async def handle_day_care_pick_up(self, adopter, match):
-        pet_name = match.groups()[0]
-        pet = self.get_from_day_care_center_by_type(pet_name, adopter)
-
-        if not pet:
-            suggested_alternative = self.get_random_from_day_care_center(adopter)
-            if not suggested_alternative:
-                return "Sorry, you have no pets in day care. Would you like to drop one off?"
-            suggested_alternative = suggested_alternative.name.split(" ")[-1]
-            return f"Sorry, you don't have {a_an(pet_name)} to collect. Would you like to collect your {suggested_alternative} instead?"
-
-        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
-        pet.is_in_day_care_center = False
 
     def handle_command(self, command, adopter, match, mentioned_entities):
         handler = getattr(self, f"handle_{command}")
