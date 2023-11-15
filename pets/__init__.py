@@ -386,6 +386,33 @@ class AgencySync:
             ("update_pet", pet, position),
         ]
 
+    def handle_day_care_drop_off(self, owner, match):
+        pet_type = match.groups()[0]
+        pet = get_one_by_type(
+            pet_type,
+            (
+                pet
+                for pet in self.pet_directory.owned(owner["id"])
+                if not pet.is_in_day_care_center
+            ),
+        )
+
+        if not pet:
+            try:
+                suggested_alternative = self.random_owned(owner).type
+            except IndexError:
+                return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
+            return f"Sorry, you don't have {a_an(pet_type)}. Would you like to drop off your {suggested_alternative} instead?"
+
+        position = DAY_CARE_CENTER.random_point()
+        pet.is_in_day_care_center = True
+
+        return [
+            ("send_message", owner, "Please don't forget about me!", pet),
+            ("update_pet", pet, position),
+        ]
+        return None
+
 
 class Agency:
     """
@@ -498,12 +525,6 @@ class Agency:
             y=pos[1],
         )
 
-    def get_non_day_care_center_owned_by_type(self, pet_name, owner):
-        for pet in self.pet_directory.owned(owner["id"]):
-            if pet.type == pet_name and not pet.is_in_day_care_center:
-                return pet
-        return None
-
     def get_from_day_care_center_by_type(self, pet_name, owner):
         for pet in self.pet_directory.owned(owner["id"]):
             if pet.type == pet_name and pet.is_in_day_care_center:
@@ -546,23 +567,6 @@ class Agency:
             pet = await self.spawn_pet(pos)
             self.pet_directory.add(pet)
         return "New pets now in stock!"
-
-    async def handle_day_care_drop_off(self, adopter, match):
-        pet_name = match.groups()[0]
-        pet = self.get_non_day_care_center_owned_by_type(pet_name, adopter)
-
-        if not pet:
-            try:
-                suggested_alternative = self.random_owned(adopter).type
-            except IndexError:
-                return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
-            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to drop off your {suggested_alternative} instead?"
-
-        await self.send_message(adopter, "Please don't forget about me!", pet)
-        position = DAY_CARE_CENTER.random_point()
-        await self.update_pet(pet, position)
-        pet.is_in_day_care_center = True
-        return None
 
     async def handle_day_care_pick_up(self, adopter, match):
         pet_name = match.groups()[0]
