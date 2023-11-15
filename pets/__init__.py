@@ -285,29 +285,24 @@ class AgencySync:
         if not any(please in match.string.lower() for please in MANNERS):
             return "No please? Our pets are only available to polite homes."
 
-        pet_name = match.groups()[1]
+        pet_type = match.groups()[1]
 
-        if pet_name == "horse":
+        if pet_type == "horse":
             return "Sorry, that's just a picture of a horse."
 
-        if pet_name == "genie":
+        if pet_type == "genie":
             return "You can't adopt me. I'm not a pet!"
 
-        if pet_name == "apatosaurus":
+        if pet_type == "apatosaurus":
             return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
 
-        if pet_name == "pet":
+        if pet_type == "pet":
             try:
                 pet = random.choice(list(self.pet_directory.available()))
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
         else:
-            pet = next(
-                filter(
-                    lambda pet: pet.name == pet_name, self.pet_directory.available()
-                ),
-                None,
-            )
+            pet = get_one_by_type(pet_type, self.pet_directory.available())
 
         if not pet:
             try:
@@ -315,7 +310,7 @@ class AgencySync:
             except IndexError:
                 return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
 
-            return f"Sorry, we don't have {a_an(pet_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
+            return f"Sorry, we don't have {a_an(pet_type)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
 
         self.pet_directory.set_owner(pet, adopter)
 
@@ -325,27 +320,21 @@ class AgencySync:
         ]
 
     def handle_abandon(self, adopter, match):
-        pet_name = match.groups()[0]
-        pet = next(
-            (
-                pet
-                for pet in self.pet_directory.owned(adopter["id"])
-                if pet.type == pet_name
-            ),
-            None,
-        )
+        pet_type = match.groups()[0]
+
+        pet = get_one_by_type(pet_type, self.pet_directory.owned(adopter["id"]))
 
         if not pet:
             try:
                 suggested_alternative = self.random_owned(adopter).type
             except IndexError:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
-            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
+            return f"Sorry, you don't have {a_an(pet_type)}. Would you like to abandon your {suggested_alternative} instead?"
 
         self.pet_directory.remove(pet)
 
         return [
-            ("send_message", adopter, sad_message(pet_name), pet),
+            ("send_message", adopter, sad_message(pet_type), pet),
             ("delete_pet", pet),
         ]
 
@@ -697,6 +686,10 @@ class Agency:
 
             if pet_update:
                 yield pet, pet_update
+
+
+def get_one_by_type(pet_type, pets):
+    return next(iter(pet for pet in pets if pet_type == pet.type), None)
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
