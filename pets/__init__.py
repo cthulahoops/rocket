@@ -328,6 +328,9 @@ class AgencySync:
     def handle_thanks(self, adopter, match):
         return random.choice(THANKS_RESPONSES)
 
+    def handle_social_rules(self, adopter, match):
+        return "Oh, you're right. Sorry!"
+
 
 class Agency:
     """
@@ -534,9 +537,6 @@ class Agency:
         await self.send_message(adopter, sad_message(pet_name), pet)
         await self.delete_pet(pet)
         return None
-
-    async def handle_social_rules(self, adopter, match):
-        return "Oh, you're right. Sorry!"
 
     async def handle_pet_a_pet(self, petter, match):
         # For the moment this command needs to be addressed to the genie (maybe won't later).
