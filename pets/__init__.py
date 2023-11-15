@@ -275,11 +275,8 @@ class AgencySync:
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
 
-    def send_message(self, recipient, message_text, sender=None):
-        sender = sender or self.genie
-        return rctogether.messages.send(
-            self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
-        )
+    def random_owned(self, owner):
+        return random.choice(self.pet_directory.owned(owner["id"]))
 
     def handle_help(self, adopter, match):
         return HELP_TEXT
@@ -325,6 +322,31 @@ class AgencySync:
         return [
             ("send_message", adopter, NOISES.get(pet.emoji, "💖"), pet),
             ("update_pet", pet.id, {"name": owned_pet_name(adopter, pet)}),
+        ]
+
+    def handle_abandon(self, adopter, match):
+        pet_name = match.groups()[0]
+        pet = next(
+            (
+                pet
+                for pet in self.pet_directory.owned(adopter["id"])
+                if pet.type == pet_name
+            ),
+            None,
+        )
+
+        if not pet:
+            try:
+                suggested_alternative = self.random_owned(adopter).type
+            except IndexError:
+                return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
+            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
+
+        self.pet_directory.remove(pet)
+
+        return [
+            ("send_message", adopter, sad_message(pet_name), pet),
+            ("delete_pet", pet),
         ]
 
     def handle_thanks(self, adopter, match):
@@ -536,30 +558,6 @@ class Agency:
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         pet.is_in_day_care_center = False
 
-    async def handle_abandon(self, adopter, match):
-        pet_name = match.groups()[0]
-        pet = next(
-            (
-                pet
-                for pet in self.pet_directory.owned(adopter["id"])
-                if pet.type == pet_name
-            ),
-            None,
-        )
-
-        if not pet:
-            try:
-                suggested_alternative = self.random_owned(adopter).type
-            except IndexError:
-                return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
-            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to abandon your {suggested_alternative} instead?"
-
-        self.pet_directory.remove(pet)
-
-        await self.send_message(adopter, sad_message(pet_name), pet)
-        await self.delete_pet(pet)
-        return None
-
     async def handle_give_pet(self, giver, match, mentioned_entities):
         pet_name = match.group(1)
         pet = next(
@@ -633,6 +631,8 @@ class Agency:
                 await self.send_message(*event[1:])
             case "update_pet":
                 await rctogether.bots.update(self.session, *event[1:])
+            case "delete_pet":
+                await self.delete_pet(event[1])
             case _:
                 raise ValueError(f"Unknown event: {event}")
 
