@@ -361,13 +361,15 @@ class AgencySync:
 
     def handle_give_pet(self, giver, match, mentioned_entities):
         pet_type = match.group(1)
-        pet = get_one_by_type(pet_type, self.pet_directory.owned(giver["id"]))
+        owned_pets = self.pet_directory.owned(giver["id"])
+        pet = get_one_by_type(pet_type, owned_pets)
 
         if not pet:
-            try:
-                suggested_alternative = self.random_owned(giver).type
-            except IndexError:
+            if not owned_pets:
                 return "Sorry, you don't have any pets to give away, perhaps you'd like to adopt one?"
+
+            suggested_alternative = random.choice(owned_pets).type
+
             return f"Sorry, you don't have {a_an(pet_type)}. Would you like to give your {suggested_alternative} instead?"
 
         if not mentioned_entities:
@@ -388,20 +390,19 @@ class AgencySync:
 
     def handle_day_care_drop_off(self, owner, match):
         pet_type = match.groups()[0]
-        pet = get_one_by_type(
-            pet_type,
-            (
-                pet
-                for pet in self.pet_directory.owned(owner["id"])
-                if not pet.is_in_day_care_center
-            ),
-        )
+
+        pets_not_in_day_care = [
+            pet
+            for pet in self.pet_directory.owned(owner["id"])
+            if not pet.is_in_day_care_center
+        ]
+
+        pet = get_one_by_type(pet_type, pets_not_in_day_care)
 
         if not pet:
-            try:
-                suggested_alternative = self.random_owned(owner).type
-            except IndexError:
+            if not pets_not_in_day_care:
                 return "Sorry, you don't have any pets to drop off, perhaps you'd like to adopt one?"
+            suggested_alternative = random.choice(pets_not_in_day_care).type
             return f"Sorry, you don't have {a_an(pet_type)}. Would you like to drop off your {suggested_alternative} instead?"
 
         position = DAY_CARE_CENTER.random_point()
@@ -547,9 +548,6 @@ class Agency:
             x=pos[0],
             y=pos[1],
         )
-
-    def random_owned(self, owner):
-        return random.choice(self.pet_directory.owned(owner["id"]))
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
