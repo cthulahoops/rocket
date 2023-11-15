@@ -270,8 +270,60 @@ class PetDirectory:
 
 
 class AgencySync:
+    def __init__(self, genie, pet_directory):
+        self.pet_directory = pet_directory
+
+    def send_message(self, recipient, message_text, sender=None):
+        sender = sender or self.genie
+        return rctogether.messages.send(
+            self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
+        )
+
     def handle_help(self, adopter, match):
         return HELP_TEXT
+
+    def handle_adoption(self, adopter, match):
+        if not any(please in match.string.lower() for please in MANNERS):
+            return "No please? Our pets are only available to polite homes."
+
+        pet_name = match.groups()[1]
+
+        if pet_name == "horse":
+            return "Sorry, that's just a picture of a horse."
+
+        if pet_name == "genie":
+            return "You can't adopt me. I'm not a pet!"
+
+        if pet_name == "apatosaurus":
+            return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
+
+        if pet_name == "pet":
+            try:
+                pet = random.choice(list(self.pet_directory.available()))
+            except IndexError:
+                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
+        else:
+            pet = next(
+                filter(
+                    lambda pet: pet.name == pet_name, self.pet_directory.available()
+                ),
+                None,
+            )
+
+        if not pet:
+            try:
+                alternative = random.choice(list(self.pet_directory.available())).name
+            except IndexError:
+                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
+
+            return f"Sorry, we don't have {a_an(pet_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
+
+        self.pet_directory.set_owner(pet, adopter)
+
+        return [
+            ("send_message", adopter, NOISES.get(pet.emoji, "💖"), pet),
+            ("update_pet", pet.id, {"name": owned_pet_name(adopter, pet)}),
+        ]
 
 
 class Agency:
@@ -291,7 +343,7 @@ class Agency:
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
-        self.agency_sync = AgencySync()
+        self.agency_sync = AgencySync(genie, pet_directory)
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
 
@@ -425,53 +477,6 @@ class Agency:
             self.pet_directory.add(pet)
         return "New pets now in stock!"
 
-    async def handle_adoption(self, adopter, match):
-        if not any(please in match.string.lower() for please in MANNERS):
-            return "No please? Our pets are only available to polite homes."
-
-        pet_name = match.groups()[1]
-
-        if pet_name == "horse":
-            return "Sorry, that's just a picture of a horse."
-
-        if pet_name == "genie":
-            return "You can't adopt me. I'm not a pet!"
-
-        if pet_name == "apatosaurus":
-            return "Since 2015 the brontasaurus and apatosaurus have been recognised as separate species. Would you like to adopt a brontasaurus?"
-
-        if pet_name == "pet":
-            try:
-                pet = random.choice(list(self.pet_directory.available()))
-            except IndexError:
-                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
-        else:
-            pet = next(
-                filter(
-                    lambda pet: pet.name == pet_name, self.pet_directory.available()
-                ),
-                None,
-            )
-
-        if not pet:
-            try:
-                alternative = random.choice(list(self.pet_directory.available())).name
-            except IndexError:
-                return "Sorry, we don't have any pets at the moment, perhaps it's time to restock?"
-
-            return f"Sorry, we don't have {a_an(pet_name)} at the moment, perhaps you'd like {a_an(alternative)} instead?"
-
-        await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
-        await rctogether.bots.update(
-            self.session,
-            pet.id,
-            {"name": owned_pet_name(adopter, pet)},
-        )
-
-        self.pet_directory.set_owner(pet, adopter)
-
-        return None
-
     async def handle_day_care_drop_off(self, adopter, match):
         pet_name = match.groups()[0]
         pet = self.get_non_day_care_center_owned_by_type(pet_name, adopter)
@@ -604,10 +609,22 @@ class Agency:
 
         if isinstance(task, str):
             await self.send_message(adopter, task)
+        elif isinstance(task, list):
+            for event in task:
+                await self.apply_event(event)
         else:
             response = await task
             if response:
                 await self.send_message(adopter, response)
+
+    async def apply_event(self, event):
+        match event[0]:
+            case "send_message":
+                await self.send_message(*event[1:])
+            case "update_pet":
+                await rctogether.bots.update(self.session, *event[1:])
+            case _:
+                raise ValueError(f"Unknown event: {event}")
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
