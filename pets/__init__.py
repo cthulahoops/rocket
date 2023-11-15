@@ -325,6 +325,9 @@ class AgencySync:
             ("update_pet", pet.id, {"name": owned_pet_name(adopter, pet)}),
         ]
 
+    def handle_thanks(self, adopter, match):
+        return random.choice(THANKS_RESPONSES)
+
 
 class Agency:
     """
@@ -507,9 +510,6 @@ class Agency:
 
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         pet.is_in_day_care_center = False
-
-    async def handle_thanks(self, adopter, match):
-        return random.choice(THANKS_RESPONSES)
 
     async def handle_abandon(self, adopter, match):
         pet_name = match.groups()[0]
