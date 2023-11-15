@@ -12,6 +12,7 @@ import rctogether
 
 from .parser import parse_command
 from .update_queues import UpdateQueues
+from . import update_queues
 
 logging.basicConfig(level=logging.INFO)
 
@@ -303,7 +304,7 @@ class Agency:
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
 
-        self._pet_update_queues = UpdateQueues()
+        self._pet_update_queues = UpdateQueues(update_queues.deduplicated_updates)
 
     async def __aenter__(self):
         return self

@@ -1,11 +1,11 @@
 import asyncio
 import pytest
-from pets.update_queues import UpdateQueues, queued_tasks
+from pets.update_queues import UpdateQueues, deduplicated_updates
 
 
 @pytest.mark.asyncio
 async def test_task_order_preservation():
-    update_queues = UpdateQueues()
+    update_queues = UpdateQueues(deduplicated_updates)
 
     results = []
 
@@ -26,7 +26,7 @@ async def test_task_order_preservation():
 
 @pytest.mark.asyncio
 async def test_task_deduplication():
-    update_queues = UpdateQueues()
+    update_queues = UpdateQueues(deduplicated_updates)
 
     tasks_processed = []
 
@@ -54,7 +54,7 @@ async def test_queued_tasks_deduplication():
     await queue.put(None)
 
     yielded_updates = []
-    async for update in queued_tasks(queue):
+    async for update in deduplicated_updates(queue):
         yielded_updates.append(update)
 
     assert yielded_updates == ["update3"]
@@ -64,7 +64,7 @@ async def test_queued_tasks_deduplication():
 async def test_queued_tasks_sequencing():
     queue = asyncio.Queue()
 
-    tasks = queued_tasks(queue)
+    tasks = deduplicated_updates(queue)
 
     await queue.put("update1")
     assert await tasks.__anext__() == "update1"

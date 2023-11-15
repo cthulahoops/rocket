@@ -1,13 +1,14 @@
 import asyncio
 import rctogether
 
-SLEEP_AFTER_UPDATE = 0.1
+SLEEP_AFTER_UPDATE = 0.001
 
 
 class UpdateQueues:
-    def __init__(self):
+    def __init__(self, queue_iterator):
         self.queues = {}
         self.tasks = {}
+        self.queue_iterator = queue_iterator
 
     async def add_task(self, queue_id, task):
         if queue_id not in self.queues:
@@ -18,7 +19,7 @@ class UpdateQueues:
         await self.queues[queue_id].put(task)
 
     async def run(self, queue_id, queue):
-        async for task in queued_tasks(queue):
+        async for task in self.queue_iterator(queue):
             try:
                 await task
             except rctogether.api.HttpError as exc:
@@ -34,17 +35,31 @@ class UpdateQueues:
             await task
 
 
-async def queued_tasks(queue):
-    while True:
+async def get_all_available_updates(queue):
+    updates = []
+    updates.append(await queue.get())
+
+    while not queue.empty():
         update = await queue.get()
-
-        while update is not None and not queue.empty():
-            next_update = await queue.get()
-            if next_update is None:
-                yield update
-            update = next_update
-
+        updates.append(update)
         if update is None:
+            break
+
+    return updates
+
+
+async def deduplicated_updates(queue):
+    while True:
+        updates = await get_all_available_updates(queue)
+
+        print("Updates: ", updates)
+
+        if updates[-1] is None:
+            while updates and updates[-1] is None:
+                updates.pop()
+
+            if updates:
+                yield updates[-1]
             return
 
-        yield update
+        yield updates[-1]
