@@ -389,49 +389,49 @@ async def test_ignores_unrelated_other(genie, owned_cat):
         await agency.handle_entity(owned_cat)
 
 
-@pytest.mark.asyncio
-async def test_corral(owned_cat):
-    pet = pets.Pet(owned_cat)
+# @pytest.mark.asyncio
+# async def test_corral(owned_cat):
+#     pet = pets.Pet(owned_cat)
 
-    assert pet.owner == 91
+#     assert pet.owner == 91
 
-    await pet.update({"x": 2, "y": 3})
+#     await pet.update({"x": 2, "y": 3})
 
-    updates = pet.queued_updates()
-    assert await updates.__anext__() == {"x": 2, "y": 3}
+#     updates = pet.queued_updates()
+#     assert await updates.__anext__() == {"x": 2, "y": 3}
 
-    corral_move = await updates.__anext__()
-    assert corral_move in pets.CORRAL
+#     corral_move = await updates.__anext__()
+#     assert corral_move in pets.CORRAL
 
-    await pet.update({"x": 8, "y": 9})
-    assert await updates.__anext__() == {"x": 8, "y": 9}
+#     await pet.update({"x": 8, "y": 9})
+#     assert await updates.__anext__() == {"x": 8, "y": 9}
 
-    corral_move = await updates.__anext__()
-    assert corral_move in pets.CORRAL
+#     corral_move = await updates.__anext__()
+#     assert corral_move in pets.CORRAL
 
-    await pet.update(None)
-    with pytest.raises(StopAsyncIteration):
-        await updates.__anext__()
+#     await pet.update(None)
+#     with pytest.raises(StopAsyncIteration):
+#         await updates.__anext__()
 
 
-@pytest.mark.asyncio
-async def test_unowned_pets_dont_escape(rocket):
-    pet = pets.Pet(rocket)
+# @pytest.mark.asyncio
+# async def test_unowned_pets_dont_escape(rocket):
+#     pet = pets.Pet(rocket)
 
-    assert pet.owner is None
+#     assert pet.owner is None
 
-    await pet.update({"x": 2, "y": 3})
+#     await pet.update({"x": 2, "y": 3})
 
-    updates = pet.queued_updates()
-    assert await updates.__anext__() == {"x": 2, "y": 3}
-    await asyncio.sleep(1.5)
+#     updates = pet.queued_updates()
+#     assert await updates.__anext__() == {"x": 2, "y": 3}
+#     await asyncio.sleep(1.5)
 
-    await pet.update({"x": 8, "y": 9})
-    assert await updates.__anext__() == {"x": 8, "y": 9}
+#     await pet.update({"x": 8, "y": 9})
+#     assert await updates.__anext__() == {"x": 8, "y": 9}
 
-    await pet.update(None)
-    with pytest.raises(StopAsyncIteration):
-        await updates.__anext__()
+#     await pet.update(None)
+#     with pytest.raises(StopAsyncIteration):
+#         await updates.__anext__()
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,6 @@ import asyncio
 import time
 
 import rctogether
-from bot import Bot
 
 from .parser import parse_command
 from .update_queues import UpdateQueues
@@ -175,9 +174,10 @@ async def reset_agency():
                 await rctogether.bots.delete(session, bot["id"])
 
 
-class Pet(Bot):
+class Pet:
     def __init__(self, bot_json, *a, **k):
-        super().__init__(bot_json, *a, **k)
+        self.bot_json = bot_json
+        self.pos = bot_json["pos"]
         self.is_in_day_care_center = False
         if bot_json.get("message"):
             self.owner = bot_json["message"]["mentioned_entity_ids"][0]
@@ -186,28 +186,48 @@ class Pet(Bot):
         else:
             self.owner = None
 
+    @classmethod
+    async def create(cls, session, name, emoji, x, y, can_be_mentioned=False):
+        bot_json = await rctogether.bots.create(
+            session, name=name, emoji=emoji, x=x, y=y, can_be_mentioned=can_be_mentioned
+        )
+        return cls(bot_json)
+
     @property
     def type(self):
         return self.name.split(" ")[-1]
 
-    async def queued_updates(self):
-        updates = super().queued_updates()
+    @property
+    def id(self):
+        return self.bot_json["id"]
 
-        while True:
-            next_update = asyncio.Task(updates.__anext__())
-            while True:
-                try:
-                    update = await asyncio.wait_for(
-                        asyncio.shield(next_update),
-                        timeout=random.randint(*PET_BOREDOM_TIMES),
-                    )
-                    yield update
-                    break
-                except asyncio.TimeoutError:
-                    if self.owner and not self.is_in_day_care_center:
-                        yield CORRAL.random_point()
-                except StopAsyncIteration:
-                    return
+    @property
+    def emoji(self):
+        return self.bot_json["emoji"]
+
+    @property
+    def name(self):
+        return self.bot_json["name"]
+
+
+#     async def queued_updates(self):
+#         updates = super().queued_updates()
+
+#         while True:
+#             next_update = asyncio.Task(updates.__anext__())
+#             while True:
+#                 try:
+#                     update = await asyncio.wait_for(
+#                         asyncio.shield(next_update),
+#                         timeout=random.randint(*PET_BOREDOM_TIMES),
+#                     )
+#                     yield update
+#                     break
+#                 except asyncio.TimeoutError:
+#                     if self.owner and not self.is_in_day_care_center:
+#                         yield CORRAL.random_point()
+#                 except StopAsyncIteration:
+#                     return
 
 
 def owned_pet_name(owner, pet):
@@ -283,7 +303,7 @@ class Agency:
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
 
-        self._bot_update_queues = UpdateQueues()
+        self._pet_update_queues = UpdateQueues()
 
     async def __aenter__(self):
         return self
@@ -298,16 +318,14 @@ class Agency:
 
         for bot_json in await rctogether.bots.get(session):
             if bot_json["emoji"] == "🧞":
-                genie = Bot(bot_json)
-                genie.start_task(session)
+                genie = Pet(bot_json)
                 print("Found the genie: ", bot_json)
             else:
                 pet = Pet(bot_json)
                 pet_directory.add(pet)
-                pet.start_task(session)
 
         if not genie:
-            genie = await Bot.create(
+            genie = await Pet.create(
                 session,
                 name=GENIE_NAME,
                 emoji="🧞",
@@ -320,18 +338,16 @@ class Agency:
         return agency
 
     async def update_pet(self, pet, update):
-        await self._bot_update_queues.add_task(
+        await self._pet_update_queues.add_task(
             pet.id, rctogether.bots.update(self.session, pet.id, update)
         )
 
+    async def delete_pet(self, pet):
+        await self._pet_update_queues.add_task(pet.id, None)
+        await rctogether.bots.delete(self.session, pet.id)
+
     async def close(self):
-        if self.genie:
-            await self.genie.close()
-
-        for pet in self.pet_directory:
-            await pet.close()
-
-        await self._bot_update_queues.close()
+        await self._pet_update_queues.close()
 
     async def spawn_pet(self, pos):
         pet = random.choice(PETS)
@@ -384,8 +400,7 @@ class Agency:
             )
             if pet:
                 self.pet_directory.remove(pet)
-                await pet.close()
-                await rctogether.bots.delete(self.session, pet.id)
+                await self.delete_pet(pet)
                 await self.send_message(
                     restocker,
                     f"{upfirst(a_an(pet.name))} was unwanted and has been sent to the farm.",
@@ -497,11 +512,8 @@ class Agency:
 
         self.pet_directory.remove(pet)
 
-        # There may be unhandled updates in the pet's message queue - they don't matter because the exceptions will just be logged.
-        # To be more correct we could push a delete event through the pet's queue.
-        await pet.close()
         await self.send_message(adopter, sad_message(pet_name), pet)
-        await rctogether.bots.delete(self.session, pet.id)
+        await self.delete_pet(pet)
         return None
 
     async def handle_social_rules(self, adopter, match):
