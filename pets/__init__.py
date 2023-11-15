@@ -269,6 +269,11 @@ class PetDirectory:
         self.add(pet)
 
 
+class AgencySync:
+    def handle_help(self, adopter, match):
+        return HELP_TEXT
+
+
 class Agency:
     """
     public interface:
@@ -286,8 +291,12 @@ class Agency:
         self.lured_pets = {}
         self.processed_message_dt = datetime.datetime.utcnow()
         self.avatars = {}
+        self.agency_sync = AgencySync()
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
+
+    def __getattr__(self, name):
+        return self.agency_sync.__getattribute__(name)
 
     async def __aenter__(self):
         return self
@@ -573,14 +582,11 @@ class Agency:
         await self.update_pet(pet, position)
         return
 
-    async def handle_help(self, adopter, match):
-        return HELP_TEXT
-
-    async def handle_command(self, command, adopter, match, mentioned_entities):
+    def handle_command(self, command, adopter, match, mentioned_entities):
         handler = getattr(self, f"handle_{command}")
         if command == "give_pet":
-            return await handler(adopter, match, mentioned_entities)
-        return await handler(adopter, match)
+            return handler(adopter, match, mentioned_entities)
+        return handler(adopter, match)
 
     async def handle_mention(self, adopter, message, mentioned_entity_ids):
         parsed = parse_command(message["text"])
@@ -594,12 +600,14 @@ class Agency:
 
         mentioned_entity_ids = [x for x in mentioned_entity_ids if x != self.genie.id]
 
-        response = await self.handle_command(
-            command, adopter, match, mentioned_entity_ids
-        )
+        task = self.handle_command(command, adopter, match, mentioned_entity_ids)
 
-        if response:
-            await self.send_message(adopter, response)
+        if isinstance(task, str):
+            await self.send_message(adopter, task)
+        else:
+            response = await task
+            if response:
+                await self.send_message(adopter, response)
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
