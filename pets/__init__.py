@@ -274,6 +274,7 @@ class AgencySync:
         self.pet_directory = pet_directory
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
+        self.avatars = {}
 
     def random_owned(self, owner):
         return random.choice(self.pet_directory.owned(owner["id"]))
@@ -316,7 +317,7 @@ class AgencySync:
 
         return [
             ("send_message", adopter, NOISES.get(pet.emoji, "💖"), pet),
-            ("update_pet", pet.id, {"name": owned_pet_name(adopter, pet)}),
+            ("sync_update_pet", pet, {"name": owned_pet_name(adopter, pet)}),
         ]
 
     def handle_abandon(self, adopter, match):
@@ -358,6 +359,33 @@ class AgencySync:
 
         return []
 
+    def handle_give_pet(self, giver, match, mentioned_entities):
+        pet_type = match.group(1)
+        pet = get_one_by_type(pet_type, self.pet_directory.owned(giver["id"]))
+
+        if not pet:
+            try:
+                suggested_alternative = self.random_owned(giver).type
+            except IndexError:
+                return "Sorry, you don't have any pets to give away, perhaps you'd like to adopt one?"
+            return f"Sorry, you don't have {a_an(pet_type)}. Would you like to give your {suggested_alternative} instead?"
+
+        if not mentioned_entities:
+            return f"Who to you want to give your {pet_type} to?"
+        recipient = self.avatars.get(mentioned_entities[0])
+
+        if not recipient:
+            return "Sorry, I don't know who that is! (Are they online?)"
+
+        self.pet_directory.set_owner(pet, recipient)
+        position = offset_position(recipient["pos"], random.choice(DELTAS))
+
+        return [
+            ("send_message", recipient, NOISES.get(pet.emoji, "💖"), pet),
+            ("sync_update_pet", pet, {"name": owned_pet_name(recipient, pet)}),
+            ("update_pet", pet, position),
+        ]
+
 
 class Agency:
     """
@@ -373,7 +401,6 @@ class Agency:
         self.genie = genie
         self.pet_directory = pet_directory
         self.processed_message_dt = datetime.datetime.utcnow()
-        self.avatars = {}
         self.agency_sync = AgencySync(genie, pet_directory)
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
@@ -385,6 +412,10 @@ class Agency:
     @property
     def lured_pets_by_petter(self):
         return self.agency_sync.lured_pets_by_petter
+
+    @property
+    def avatars(self):
+        return self.agency_sync.avatars
 
     def __getattr__(self, name):
         return self.agency_sync.__getattribute__(name)
@@ -547,43 +578,6 @@ class Agency:
         await self.send_message(adopter, NOISES.get(pet.emoji, "💖"), pet)
         pet.is_in_day_care_center = False
 
-    async def handle_give_pet(self, giver, match, mentioned_entities):
-        pet_name = match.group(1)
-        pet = next(
-            (
-                pet
-                for pet in self.pet_directory.owned(giver["id"])
-                if pet.type == pet_name
-            ),
-            None,
-        )
-
-        if not pet:
-            try:
-                suggested_alternative = self.random_owned(giver).type
-            except IndexError:
-                return "Sorry, you don't have any pets to give away, perhaps you'd like to adopt one?"
-            return f"Sorry, you don't have {a_an(pet_name)}. Would you like to give your {suggested_alternative} instead?"
-
-        if not mentioned_entities:
-            return f"Who to you want to give your {pet_name} to?"
-        recipient = self.avatars.get(mentioned_entities[0])
-
-        if not recipient:
-            return "Sorry, I don't know who that is! (Are they online?)"
-
-        await self.send_message(recipient, NOISES.get(pet.emoji, "💖"), pet)
-        await rctogether.bots.update(
-            self.session,
-            pet.id,
-            {"name": owned_pet_name(recipient, pet)},
-        )
-
-        self.pet_directory.set_owner(pet, recipient)
-        position = offset_position(recipient["pos"], random.choice(DELTAS))
-        await self.update_pet(pet, position)
-        return
-
     def handle_command(self, command, adopter, match, mentioned_entities):
         handler = getattr(self, f"handle_{command}")
         if command == "give_pet":
@@ -619,7 +613,9 @@ class Agency:
             case "send_message":
                 await self.send_message(*event[1:])
             case "update_pet":
-                await rctogether.bots.update(self.session, *event[1:])
+                await self.update_pet(*event[1:])
+            case "sync_update_pet":
+                await rctogether.bots.update(self.session, event[1].id, event[2])
             case "delete_pet":
                 await self.delete_pet(event[1])
             case _:
