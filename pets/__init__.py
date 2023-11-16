@@ -625,12 +625,6 @@ class Agency:
             self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
 
-    def handle_command(self, command, adopter, match, mentioned_entities):
-        handler = getattr(self.agency_sync, f"handle_{command}")
-        if command == "give_pet":
-            return handler(adopter, match, mentioned_entities)
-        return handler(adopter, match)
-
     async def handle_mention(self, adopter, message):
         mentioned_entity_ids = message["mentioned_entity_ids"]
 
