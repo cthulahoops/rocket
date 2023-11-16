@@ -494,8 +494,6 @@ class AgencySync:
                 "can_be_mentioned": False,
             }
             yield ("create_pet", pet)
-            # pet = await self.spawn_pet(pos)
-            # self.pet_directory.add(pet)
         yield "New pets now in stock!"
 
     def handle_created(self, pet_json):
@@ -584,11 +582,6 @@ class Agency:
 
         return agency
 
-    async def update_pet(self, pet, update):
-        await self._pet_update_queues.add_task(
-            pet.id, rctogether.bots.update(self.session, pet.id, update)
-        )
-
     async def queue_iterator(self, queue, pet_id):
         pet = self.agency_sync.pet_directory.get(pet_id)
 
@@ -610,20 +603,8 @@ class Agency:
                 except StopAsyncIteration:
                     return
 
-    async def delete_pet(self, pet):
-        await self._pet_update_queues.add_task(pet.id, None)
-        await rctogether.bots.delete(self.session, pet.id)
-
     async def close(self):
         await self._pet_update_queues.close()
-
-    async def spawn_pet(self, pet):
-        return await rctogether.bots.create(self.session, **pet)
-
-    async def send_message(self, recipient, message_text, sender):
-        await rctogether.messages.send(
-            self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
-        )
 
     async def handle_mention(self, adopter, message):
         mentioned_entity_ids = message["mentioned_entity_ids"]
@@ -641,15 +622,25 @@ class Agency:
     async def apply_event(self, event):
         match event[0]:
             case "send_message":
-                await self.send_message(*event[1:])
+                recipient, message_text, sender = event[1:]
+                await rctogether.messages.send(
+                    self.session,
+                    sender.id,
+                    f"@**{recipient['person_name']}** {message_text}",
+                )
             case "update_pet":
-                await self.update_pet(*event[1:])
+                pet, update = event[1:]
+                await self._pet_update_queues.add_task(
+                    pet.id, rctogether.bots.update(self.session, pet.id, update)
+                )
             case "sync_update_pet":
                 await rctogether.bots.update(self.session, event[1].id, event[2])
             case "delete_pet":
-                await self.delete_pet(event[1])
+                pet = event[1]
+                await self._pet_update_queues.add_task(pet.id, None)
+                await rctogether.bots.delete(self.session, pet.id)
             case "create_pet":
-                pet = await self.spawn_pet(event[1])
+                pet = await rctogether.bots.create(self.session, **event[1])
                 self.agency_sync.handle_created(pet)
             case _:
                 raise ValueError(f"Unknown event: {event}")
