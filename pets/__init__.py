@@ -263,12 +263,38 @@ class PetDirectory:
         self.add(pet)
 
 
+class Lured:
+    def __init__(self):
+        self.pets = {}
+        self.by_petter = defaultdict(list)
+
+    def add(self, pet, petter):
+        self.pets[pet.id] = time.time() + LURE_TIME_SECONDS
+        self.by_petter[petter["id"]].append(pet)
+
+    def check(self, pet):
+        if pet.id not in self.pets:
+            return False
+
+        if self.pets[pet.id] < time.time():  # if timer is expired
+            del self.pets[pet.id]
+            for petter_id in self.by_petter:
+                for lured_pet in self.by_petter[petter_id]:
+                    if lured_pet.id == pet.id:
+                        self.by_petter[petter_id].remove(lured_pet)
+            return False
+
+        return True
+
+    def get_by_petter(self, petter_id):
+        return self.by_petter.get(petter_id, [])
+
+
 class AgencySync:
     def __init__(self):
         self.pet_directory = PetDirectory()
         self.genie = None
-        self.lured_pets_by_petter = defaultdict(list)
-        self.lured_pets = {}
+        self.lured = Lured()
         self.avatars = {}
         self.genie = None
 
@@ -287,20 +313,6 @@ class AgencySync:
                     "can_be_mentioned": True,
                 },
             )
-
-    def check_lured(self, pet):
-        if pet.id not in self.lured_pets:
-            return False
-
-        if self.lured_pets[pet.id] < time.time():  # if timer is expired
-            del self.lured_pets[pet.id]
-            for petter_id in self.lured_pets_by_petter:
-                for lured_pet in self.lured_pets_by_petter[petter_id]:
-                    if lured_pet.id == pet.id:
-                        self.lured_pets_by_petter[petter_id].remove(lured_pet)
-            return False
-
-        return True
 
     def handle_help(self, adopter):
         return HELP_TEXT
@@ -370,8 +382,7 @@ class AgencySync:
         #  Do we have any pets of the right type next to the speaker?
         for pet in self.pet_directory.all_owned():
             if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
-                self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
-                self.lured_pets_by_petter[petter["id"]].append(pet)
+                self.lured.add(pet, petter)
 
         return []
 
@@ -451,12 +462,12 @@ class AgencySync:
     def handle_avatar(self, entity):
         self.avatars[entity["id"]] = entity
 
-        for pet in self.lured_pets_by_petter.get(entity["id"], []):
+        for pet in self.lured.get_by_petter(entity["id"]):
             position = offset_position(entity["pos"], random.choice(DELTAS))
             yield ("update_pet", pet, position)
 
         for pet in self.pet_directory.owned(entity["id"]):
-            if pet.is_in_day_care_center or self.check_lured(pet):
+            if pet.is_in_day_care_center or self.lured.check(pet):
                 pet_update = {}
             else:
                 pet_update = offset_position(entity["pos"], random.choice(DELTAS))
