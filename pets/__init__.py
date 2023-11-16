@@ -579,10 +579,6 @@ class Agency:
         self.agency_sync = AgencySync()
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
 
-    @property
-    def pet_directory(self):
-        return self.agency_sync.pet_directory
-
     async def __aenter__(self):
         return self
 
@@ -606,7 +602,7 @@ class Agency:
         )
 
     async def queue_iterator(self, queue, pet_id):
-        pet = self.pet_directory.get(pet_id)
+        pet = self.agency_sync.pet_directory.get(pet_id)
 
         updates = update_queues.deduplicated_updates(queue)
 

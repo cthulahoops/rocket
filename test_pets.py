@@ -521,7 +521,7 @@ async def test_restock_from_empty(genie, person):
     async with await pets.Agency.create(session) as agency:
         await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
 
-    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
+    assert len(agency.agency_sync.pet_directory.available()) == len(pets.SPAWN_POINTS)
     assert await session.message_received(genie, person) == "New pets now in stock!"
 
 
@@ -541,7 +541,7 @@ async def test_restock_partial(genie, person, available_pets):
         == "A bat was unwanted and has been sent to the farm."
     )
 
-    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
+    assert len(agency.agency_sync.pet_directory.available()) == len(pets.SPAWN_POINTS)
     assert await session.message_received(genie, person) == "New pets now in stock!"
 
 
@@ -552,7 +552,7 @@ async def test_restock_full(genie, person, available_pets):
     async with await pets.Agency.create(session) as agency:
         await agency.handle_entity(incoming_message(person, genie, "Time to restock!"))
 
-    assert len(agency.pet_directory.available()) == len(pets.SPAWN_POINTS)
+    assert len(agency.agency_sync.pet_directory.available()) == len(pets.SPAWN_POINTS)
     assert await session.message_received(genie, person) == "New pets now in stock!"
 
 
