@@ -188,13 +188,6 @@ class Pet:
         else:
             self.owner = None
 
-    @classmethod
-    async def create(cls, session, name, emoji, x, y, can_be_mentioned=False):
-        bot_json = await rctogether.bots.create(
-            session, name=name, emoji=emoji, x=x, y=y, can_be_mentioned=can_be_mentioned
-        )
-        return cls(bot_json)
-
     @property
     def type(self):
         return self.name.split(" ")[-1]
