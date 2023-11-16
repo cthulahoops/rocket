@@ -643,7 +643,14 @@ class Agency:
             return handler(adopter, match, mentioned_entities)
         return handler(adopter, match)
 
-    async def handle_mention(self, adopter, message, mentioned_entity_ids):
+    async def handle_mention(self, adopter, message):
+        mentioned_entity_ids = message["mentioned_entity_ids"]
+
+        message_dt = parse_dt(message["sent_at"])
+        if message_dt <= self.processed_message_dt:
+            return
+        self.processed_message_dt = message_dt
+
         for event in self.agency_sync.handle_mention(
             adopter, message, mentioned_entity_ids
         ):
@@ -669,16 +676,8 @@ class Agency:
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
             message = entity.get("message")
-
             if message:
-                message_dt = datetime.datetime.strptime(
-                    message["sent_at"], "%Y-%m-%dT%H:%M:%SZ"
-                )
-                if message_dt > self.processed_message_dt:
-                    await self.handle_mention(
-                        entity, message, message["mentioned_entity_ids"]
-                    )
-                    self.processed_message_dt = message_dt
+                await self.handle_mention(entity, message)
 
             for event in self.agency_sync.handle_avatar(entity):
                 await self.apply_event(event)
@@ -689,6 +688,10 @@ class Agency:
 
 def get_one_by_type(pet_type, pets):
     return next(iter(pet for pet in pets if pet_type == pet.type), None)
+
+
+def parse_dt(date_string):
+    return datetime.datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%SZ")
 
 
 DELTAS = [{"x": x, "y": y} for x in [-1, 0, 1] for y in [-1, 0, 1] if x != 0 or y != 0]
