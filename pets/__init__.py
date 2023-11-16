@@ -104,6 +104,7 @@ PETS = [
 NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
 GENIE_NAME = os.environ.get("GENIE_NAME", "Pet Agency Genie")
+GENIE_EMOJI = "🧞"
 GENIE_HOME = parse_position(os.environ.get("GENIE_HOME", "60,15"))
 SPAWN_POINTS = {
     position_tuple(offset_position(GENIE_HOME, {"x": dx, "y": dy}))
@@ -270,11 +271,29 @@ class PetDirectory:
 
 
 class AgencySync:
-    def __init__(self, genie, pet_directory):
-        self.pet_directory = pet_directory
+    def __init__(self):
+        self.pet_directory = PetDirectory()
+        self.genie = None
         self.lured_pets_by_petter = defaultdict(list)
         self.lured_pets = {}
         self.avatars = {}
+        self.genie = None
+
+    def start(self, bots):
+        for bot_json in bots:
+            self.handle_created(bot_json)
+
+        if not self.genie:
+            yield (
+                "create_pet",
+                {
+                    "name": GENIE_NAME,
+                    "emoji": "🧞",
+                    "x": GENIE_HOME["x"],
+                    "y": GENIE_HOME["y"],
+                    "can_be_mentioned": True,
+                },
+            )
 
     def check_lured(self, pet):
         if pet.id not in self.lured_pets:
@@ -501,7 +520,12 @@ class AgencySync:
         yield "New pets now in stock!"
 
     def handle_created(self, pet_json):
-        self.pet_directory.add(Pet(pet_json))
+        pet = Pet(pet_json)
+        if pet.emoji == GENIE_EMOJI:
+            print("Found the genie: ", pet_json)
+            self.genie = pet
+        else:
+            self.pet_directory.add(pet)
 
     def handle_bot(self, entity):
         try:
@@ -525,14 +549,19 @@ class Agency:
             (json_blob)
     """
 
-    def __init__(self, session, genie, pet_directory):
+    def __init__(self, session):
         self.session = session
-        self.genie = genie
-        self.pet_directory = pet_directory
         self.processed_message_dt = datetime.datetime.utcnow()
-        self.agency_sync = AgencySync(genie, pet_directory)
-
+        self.agency_sync = AgencySync()
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
+
+    @property
+    def genie(self):
+        return self.agency_sync.genie
+
+    @property
+    def pet_directory(self):
+        return self.agency_sync.pet_directory
 
     async def __aenter__(self):
         return self
@@ -542,28 +571,13 @@ class Agency:
 
     @classmethod
     async def create(cls, session):
-        genie = None
-        pet_directory = PetDirectory()
+        bots = await rctogether.bots.get(session)
 
-        for bot_json in await rctogether.bots.get(session):
-            if bot_json["emoji"] == "🧞":
-                genie = Pet(bot_json)
-                print("Found the genie: ", bot_json)
-            else:
-                pet = Pet(bot_json)
-                pet_directory.add(pet)
+        agency = cls(session)
 
-        if not genie:
-            genie = await Pet.create(
-                session,
-                name=GENIE_NAME,
-                emoji="🧞",
-                x=GENIE_HOME["x"],
-                y=GENIE_HOME["y"],
-                can_be_mentioned=True,
-            )
+        for event in agency.agency_sync.start(bots):
+            await agency.apply_event(event)
 
-        agency = cls(session, genie, pet_directory)
         return agency
 
     async def update_pet(self, pet, update):
