@@ -563,7 +563,7 @@ class Agency:
         self.session = session
         self.processed_message_dt = datetime.datetime.utcnow()
         self.agency_sync = AgencySync()
-        self._pet_update_queues = UpdateQueues(self.queue_iterator)
+        self._update_queues = UpdateQueues(self.queue_iterator)
 
     async def __aenter__(self):
         return self
@@ -604,7 +604,7 @@ class Agency:
                     return
 
     async def close(self):
-        await self._pet_update_queues.close()
+        await self._update_queues.close()
 
     async def handle_mention(self, adopter, message):
         mentioned_entity_ids = message["mentioned_entity_ids"]
@@ -630,14 +630,14 @@ class Agency:
                 )
             case "update_pet":
                 pet, update = event[1:]
-                await self._pet_update_queues.add_task(
+                await self._update_queues.add_task(
                     pet.id, rctogether.bots.update(self.session, pet.id, update)
                 )
             case "sync_update_pet":
                 await rctogether.bots.update(self.session, event[1].id, event[2])
             case "delete_pet":
                 pet = event[1]
-                await self._pet_update_queues.add_task(pet.id, None)
+                await self._update_queues.add_task(pet.id, None)
                 await rctogether.bots.delete(self.session, pet.id)
             case "create_pet":
                 pet = await rctogether.bots.create(self.session, **event[1])
