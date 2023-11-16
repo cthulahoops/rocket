@@ -470,6 +470,31 @@ class AgencySync:
             if pet_update:
                 yield ("update_pet", pet, pet_update)
 
+    def handle_restock(self, restocker, match):
+        actions = []
+
+        if self.pet_directory.empty_spawn_points():
+            pet = min(
+                self.pet_directory.available(), key=lambda pet: pet.id, default=None
+            )
+            if pet:
+                self.pet_directory.remove(pet)
+                yield ("delete_pet", pet)
+                yield (
+                    "send_message",
+                    restocker,
+                    f"{upfirst(a_an(pet.type))} was unwanted and has been sent to the farm.",
+                )
+
+        for pos in self.pet_directory.empty_spawn_points():
+            yield ("create_pet", pos)
+            # pet = await self.spawn_pet(pos)
+            # self.pet_directory.add(pet)
+        yield "New pets now in stock!"
+
+    def handle_created(self, pet):
+        self.pet_directory.add(pet)
+
     def handle_bot(self, entity):
         try:
             pet = self.pet_directory[entity["id"]]
@@ -597,24 +622,6 @@ class Agency:
             self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
 
-    async def handle_restock(self, restocker, match):
-        if self.pet_directory.empty_spawn_points():
-            pet = min(
-                self.pet_directory.available(), key=lambda pet: pet.id, default=None
-            )
-            if pet:
-                self.pet_directory.remove(pet)
-                await self.delete_pet(pet)
-                await self.send_message(
-                    restocker,
-                    f"{upfirst(a_an(pet.name))} was unwanted and has been sent to the farm.",
-                )
-
-        for pos in self.pet_directory.empty_spawn_points():
-            pet = await self.spawn_pet(pos)
-            self.pet_directory.add(pet)
-        return "New pets now in stock!"
-
     def handle_command(self, command, adopter, match, mentioned_entities):
         handler = getattr(self, f"handle_{command}")
         if command == "give_pet":
@@ -636,14 +643,13 @@ class Agency:
         task = self.handle_command(command, adopter, match, mentioned_entity_ids)
 
         if isinstance(task, str):
-            await self.send_message(adopter, task)
-        elif isinstance(task, list):
-            for event in task:
-                await self.apply_event(event)
-        else:
-            response = await task
-            if response:
-                await self.send_message(adopter, response)
+            task = [task]
+
+        for event in task:
+            if isinstance(event, str):
+                event = ("send_message", adopter, event)
+
+            await self.apply_event(event)
 
     async def apply_event(self, event):
         match event[0]:
@@ -655,6 +661,9 @@ class Agency:
                 await rctogether.bots.update(self.session, event[1].id, event[2])
             case "delete_pet":
                 await self.delete_pet(event[1])
+            case "create_pet":
+                pet = await self.spawn_pet(event[1])
+                self.agency_sync.handle_created(pet)
             case _:
                 raise ValueError(f"Unknown event: {event}")
 
