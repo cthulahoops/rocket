@@ -1,6 +1,7 @@
 from collections import namedtuple
 import asyncio
 import itertools
+from datetime import datetime
 
 import pytest
 
@@ -150,14 +151,18 @@ def in_day_care_unicorn_fixture(person):
     }
 
 
-def incoming_message(sender, recipients, message):
+def incoming_message(sender, recipients, message, dt=0):
     if isinstance(recipients, dict):
         recipients = [recipients]
     recipients = [recipient["id"] for recipient in recipients]
 
+    epoch_seconds = 2015491007  # Some time in 2033
+    sent_at = datetime.utcfromtimestamp(epoch_seconds + dt).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
     sender["message"] = {
         "mentioned_entity_ids": recipients,
-        "sent_at": "2037-12-31T23:59:59Z",  # More reasonable sent_at.
+        "sent_at": sent_at,
         "text": message,
     }
     return sender
@@ -565,7 +570,10 @@ async def test_successful_give_pet(genie, person, petless_person, owned_cat):
 
         await agency.handle_entity(
             incoming_message(
-                person, [genie, petless_person], "Give my cat to @**Petless Person**!"
+                person,
+                [genie, petless_person],
+                "Give my cat to @**Petless Person**!",
+                dt=2,
             )
         )
 

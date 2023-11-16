@@ -550,6 +550,9 @@ class AgencySync:
         return handler(adopter, match)
 
     def handle_mention(self, adopter, message, mentioned_entity_ids):
+        if self.genie.id not in mentioned_entity_ids:
+            return
+
         events = self.handle_command(adopter, message["text"], mentioned_entity_ids)
 
         if isinstance(events, str):
@@ -674,7 +677,7 @@ class Agency:
 
             message = entity.get("message")
 
-            if message and self.agency_sync.genie.id in message["mentioned_entity_ids"]:
+            if message:
                 message_dt = datetime.datetime.strptime(
                     message["sent_at"], "%Y-%m-%dT%H:%M:%SZ"
                 )
