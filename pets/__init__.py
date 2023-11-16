@@ -489,11 +489,7 @@ class AgencySync:
             if pet:
                 self.pet_directory.remove(pet)
                 yield ("delete_pet", pet)
-                yield (
-                    "send_message",
-                    restocker,
-                    f"{upfirst(a_an(pet.type))} was unwanted and has been sent to the farm.",
-                )
+                yield f"{upfirst(a_an(pet.type))} was unwanted and has been sent to the farm."
 
         for pos in self.pet_directory.empty_spawn_points():
             pet = random.choice(PETS)
@@ -582,10 +578,6 @@ class Agency:
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
 
     @property
-    def genie(self):
-        return self.agency_sync.genie
-
-    @property
     def pet_directory(self):
         return self.agency_sync.pet_directory
 
@@ -642,8 +634,7 @@ class Agency:
     async def spawn_pet(self, pet):
         return await rctogether.bots.create(self.session, **pet)
 
-    async def send_message(self, recipient, message_text, sender=None):
-        sender = sender or self.genie
+    async def send_message(self, recipient, message_text, sender):
         await rctogether.messages.send(
             self.session, sender.id, f"@**{recipient['person_name']}** {message_text}"
         )
@@ -683,7 +674,7 @@ class Agency:
 
             message = entity.get("message")
 
-            if message and self.genie.id in message["mentioned_entity_ids"]:
+            if message and self.agency_sync.genie.id in message["mentioned_entity_ids"]:
                 message_dt = datetime.datetime.strptime(
                     message["sent_at"], "%Y-%m-%dT%H:%M:%SZ"
                 )

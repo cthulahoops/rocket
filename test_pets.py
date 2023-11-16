@@ -611,7 +611,7 @@ async def test_genie_autospawn():
     async with await pets.Agency.create(session) as agency:
         pass
 
-    assert agency.genie.name == "Pet Agency Genie"
+    assert agency.agency_sync.genie.name == "Pet Agency Genie"
 
 
 @pytest.mark.asyncio
