@@ -302,14 +302,12 @@ class AgencySync:
 
         return True
 
-    def handle_help(self, adopter, match):
+    def handle_help(self, adopter):
         return HELP_TEXT
 
-    def handle_adoption(self, adopter, match):
-        if not any(please in match.string.lower() for please in MANNERS):
+    def handle_adoption(self, adopter, text, pet_type):
+        if not any(please in text.lower() for please in MANNERS):
             return "No please? Our pets are only available to polite homes."
-
-        pet_type = match.groups()[1]
 
         if pet_type == "horse":
             return "Sorry, that's just a picture of a horse."
@@ -343,9 +341,7 @@ class AgencySync:
             ("sync_update_pet", pet, {"name": owned_pet_name(adopter, pet)}),
         ]
 
-    def handle_abandon(self, adopter, match):
-        pet_type = match.groups()[0]
-
+    def handle_abandon(self, adopter, pet_type):
         owned_pets = self.pet_directory.owned(adopter["id"])
         pet = get_one_by_type(pet_type, owned_pets)
 
@@ -362,19 +358,16 @@ class AgencySync:
             ("delete_pet", pet),
         ]
 
-    def handle_thanks(self, adopter, match):
+    def handle_thanks(self, adopter):
         return random.choice(THANKS_RESPONSES)
 
-    def handle_social_rules(self, adopter, match):
+    def handle_social_rules(self, adopter):
         return "Oh, you're right. Sorry!"
 
-    def handle_pet_a_pet(self, petter, match):
+    def handle_pet_a_pet(self, petter, pet_type):
         # For the moment this command needs to be addressed to the genie (maybe won't later).
         # Find any pets next to the speaker of the right type.
         #  Do we have any pets of the right type next to the speaker?
-
-        pet_type = match.group(1)
-
         for pet in self.pet_directory.all_owned():
             if is_adjacent(petter["pos"], pet.pos) and pet.type == pet_type:
                 self.lured_pets[pet.id] = time.time() + LURE_TIME_SECONDS
@@ -382,8 +375,7 @@ class AgencySync:
 
         return []
 
-    def handle_give_pet(self, giver, match, mentioned_entities):
-        pet_type = match.group(1)
+    def handle_give_pet(self, giver, pet_type, mentioned_entities):
         owned_pets = self.pet_directory.owned(giver["id"])
         pet = get_one_by_type(pet_type, owned_pets)
 
@@ -411,9 +403,7 @@ class AgencySync:
             ("update_pet", pet, position),
         ]
 
-    def handle_day_care_drop_off(self, owner, match):
-        pet_type = match.groups()[0]
-
+    def handle_day_care_drop_off(self, owner, pet_type):
         pets_not_in_day_care = [
             pet
             for pet in self.pet_directory.owned(owner["id"])
@@ -437,9 +427,7 @@ class AgencySync:
         ]
         return None
 
-    def handle_day_care_pick_up(self, owner, match):
-        pet_type = match.groups()[0]
-
+    def handle_day_care_pick_up(self, owner, pet_type):
         pets_in_day_care = [
             pet
             for pet in self.pet_directory.owned(owner["id"])
@@ -481,7 +469,7 @@ class AgencySync:
             if pet_update:
                 yield ("update_pet", pet, pet_update)
 
-    def handle_restock(self, restocker, match):
+    def handle_restock(self, restocker):
         actions = []
 
         if self.pet_directory.empty_spawn_points():
@@ -539,14 +527,14 @@ class AgencySync:
         if command == "give_pet":
             return handler(
                 adopter,
-                match,
+                match.group(1),
                 [
                     entity_id
                     for entity_id in mentioned_entities
                     if entity_id != self.genie.id
                 ],
             )
-        return handler(adopter, match)
+        return handler(adopter, *match.groups())
 
     def handle_mention(self, adopter, message, mentioned_entity_ids):
         if self.genie.id not in mentioned_entity_ids:
@@ -654,7 +642,6 @@ class Agency:
         for event in self.agency_sync.handle_mention(
             adopter, message, mentioned_entity_ids
         ):
-            print("EVENT: ", event)
             await self.apply_event(event)
 
     async def apply_event(self, event):

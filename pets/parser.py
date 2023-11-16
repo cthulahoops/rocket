@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Match
 
 COMMANDS = {
     "time to restock": "restock",
-    "adopt (a|an|the|one)? ([A-Za-z-]+)": "adoption",
+    "(.*adopt (?:a|an|the|one)? ([A-Za-z-]+).*)": "adoption",
     r"(?:look after|take care of|drop off) my ([A-Za-z]+)": "day_care_drop_off",
     r"(?:collect|pick up|get) my ([A-Za-z]+)": "day_care_pick_up",
     "thank": "thanks",
