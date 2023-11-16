@@ -484,13 +484,24 @@ class AgencySync:
                 )
 
         for pos in self.pet_directory.empty_spawn_points():
-            yield ("create_pet", pos)
+            pet = random.choice(PETS)
+            while any(x.emoji == pet["emoji"] for x in self.pet_directory.available()):
+                pet = random.choice(PETS)
+
+            pet = {
+                "name": pet["name"],
+                "emoji": pet["emoji"],
+                "x": pos[0],
+                "y": pos[1],
+                "can_be_mentioned": False,
+            }
+            yield ("create_pet", pet)
             # pet = await self.spawn_pet(pos)
             # self.pet_directory.add(pet)
         yield "New pets now in stock!"
 
-    def handle_created(self, pet):
-        self.pet_directory.add(pet)
+    def handle_created(self, pet_json):
+        self.pet_directory.add(Pet(pet_json))
 
     def handle_bot(self, entity):
         try:
@@ -588,18 +599,8 @@ class Agency:
     async def close(self):
         await self._pet_update_queues.close()
 
-    async def spawn_pet(self, pos):
-        pet = random.choice(PETS)
-        while any(x.emoji == pet["emoji"] for x in self.pet_directory.available()):
-            pet = random.choice(PETS)
-
-        return await Pet.create(
-            self.session,
-            name=pet["name"],
-            emoji=pet["emoji"],
-            x=pos[0],
-            y=pos[1],
-        )
+    async def spawn_pet(self, pet):
+        return await rctogether.bots.create(self.session, **pet)
 
     async def send_message(self, recipient, message_text, sender=None):
         sender = sender or self.genie
