@@ -460,7 +460,9 @@ class AgencySync:
             ("send_message", owner, NOISES.get(pet.emoji, "💖"), pet),
         ]
 
-    def handle_avatar_move(self, entity):
+    def handle_avatar(self, entity):
+        self.avatars[entity["id"]] = entity
+
         for pet in self.lured_pets_by_petter.get(entity["id"], []):
             position = offset_position(entity["pos"], random.choice(DELTAS))
             yield ("update_pet", pet, position)
@@ -524,9 +526,6 @@ class AgencySync:
         else:
             pet.pos = entity["pos"]
             pet.bot_json["name"] = entity["name"]
-
-    def handle_avatar(self, entity):
-        self.avatars[entity["id"]] = entity
 
     def handle_command(self, adopter, text, mentioned_entities):
         parsed = parse_command(text)
@@ -673,8 +672,6 @@ class Agency:
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
-            self.agency_sync.handle_avatar(entity)
-
             message = entity.get("message")
 
             if message:
@@ -687,8 +684,7 @@ class Agency:
                     )
                     self.processed_message_dt = message_dt
 
-        if entity["type"] == "Avatar":
-            for event in self.agency_sync.handle_avatar_move(entity):
+            for event in self.agency_sync.handle_avatar(entity):
                 await self.apply_event(event)
 
         if entity["type"] == "Bot":
