@@ -290,9 +290,6 @@ class AgencySync:
 
         return True
 
-    def random_owned(self, owner):
-        return random.choice(self.pet_directory.owned(owner["id"]))
-
     def handle_help(self, adopter, match):
         return HELP_TEXT
 
@@ -337,13 +334,13 @@ class AgencySync:
     def handle_abandon(self, adopter, match):
         pet_type = match.groups()[0]
 
-        pet = get_one_by_type(pet_type, self.pet_directory.owned(adopter["id"]))
+        owned_pets = self.pet_directory.owned(adopter["id"])
+        pet = get_one_by_type(pet_type, owned_pets)
 
         if not pet:
-            try:
-                suggested_alternative = self.random_owned(adopter).type
-            except IndexError:
+            if not owned_pets:
                 return "Sorry, you don't have any pets to abandon, perhaps you'd like to adopt one?"
+            suggested_alternative = random.choice(owned_pets).type
             return f"Sorry, you don't have {a_an(pet_type)}. Would you like to abandon your {suggested_alternative} instead?"
 
         self.pet_directory.remove(pet)
