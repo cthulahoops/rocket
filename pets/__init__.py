@@ -631,30 +631,29 @@ class Agency:
             await self.apply_event(event)
 
     async def apply_event(self, event):
-        match event[0]:
-            case "send_message":
-                recipient, message_text, sender = event[1:]
-                await rctogether.messages.send(
-                    self.session,
-                    sender.id,
-                    f"@**{recipient['person_name']}** {message_text}",
-                )
-            case "update_pet":
-                pet, update = event[1:]
-                await self._update_queues.add_task(
-                    pet.id, rctogether.bots.update(self.session, pet.id, update)
-                )
-            case "sync_update_pet":
-                await rctogether.bots.update(self.session, event[1].id, event[2])
-            case "delete_pet":
-                pet = event[1]
-                await self._update_queues.add_task(pet.id, None)
-                await rctogether.bots.delete(self.session, pet.id)
-            case "create_pet":
-                pet = await rctogether.bots.create(self.session, **event[1])
-                self.agency_sync.handle_created(pet)
-            case _:
-                raise ValueError(f"Unknown event: {event}")
+        if event[0] == "send_message":
+            recipient, message_text, sender = event[1:]
+            await rctogether.messages.send(
+                self.session,
+                sender.id,
+                f"@**{recipient['person_name']}** {message_text}",
+            )
+        elif event[0] == "update_pet":
+            pet, update = event[1:]
+            await self._update_queues.add_task(
+                pet.id, rctogether.bots.update(self.session, pet.id, update)
+            )
+        elif event[0] == "sync_update_pet":
+            await rctogether.bots.update(self.session, event[1].id, event[2])
+        elif event[0] == "delete_pet":
+            pet = event[1]
+            await self._update_queues.add_task(pet.id, None)
+            await rctogether.bots.delete(self.session, pet.id)
+        elif event[0] == "create_pet":
+            pet = await rctogether.bots.create(self.session, **event[1])
+            self.agency_sync.handle_created(pet)
+        else:
+            raise ValueError(f"Unknown event: {event}")
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
