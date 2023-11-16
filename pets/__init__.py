@@ -520,18 +520,6 @@ class Agency:
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
 
-    @property
-    def lured_pets(self):
-        return self.agency_sync.lured_pets
-
-    @property
-    def lured_pets_by_petter(self):
-        return self.agency_sync.lured_pets_by_petter
-
-    @property
-    def avatars(self):
-        return self.agency_sync.avatars
-
     def __getattr__(self, name):
         return self.agency_sync.__getattribute__(name)
 
