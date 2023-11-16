@@ -5,7 +5,7 @@ description = ""
 authors = ["Adam Kelly <adam@cthulahoops.org>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11"
 rctogether = "^0.3.3"
 
 [tool.poetry.group.dev.dependencies]
