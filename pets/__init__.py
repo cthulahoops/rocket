@@ -532,6 +532,39 @@ class AgencySync:
     def handle_avatar(self, entity):
         self.avatars[entity["id"]] = entity
 
+    def handle_command(self, adopter, text, mentioned_entities):
+        parsed = parse_command(text)
+
+        if not parsed:
+            return "Sorry, I don't understand. Would you like to adopt a pet?"
+
+        command, match = parsed
+
+        handler = getattr(self, f"handle_{command}")
+        if command == "give_pet":
+            return handler(
+                adopter,
+                match,
+                [
+                    entity_id
+                    for entity_id in mentioned_entities
+                    if entity_id != self.genie.id
+                ],
+            )
+        return handler(adopter, match)
+
+    def handle_mention(self, adopter, message, mentioned_entity_ids):
+        events = self.handle_command(adopter, message["text"], mentioned_entity_ids)
+
+        if isinstance(events, str):
+            events = [events]
+
+        for event in events:
+            if isinstance(event, str):
+                event = ("send_message", adopter, event, self.genie)
+
+            yield event
+
 
 class Agency:
     """
@@ -622,26 +655,10 @@ class Agency:
         return handler(adopter, match)
 
     async def handle_mention(self, adopter, message, mentioned_entity_ids):
-        parsed = parse_command(message["text"])
-
-        if not parsed:
-            await self.send_message(
-                adopter, "Sorry, I don't understand. Would you like to adopt a pet?"
-            )
-            return
-        command, match = parsed
-
-        mentioned_entity_ids = [x for x in mentioned_entity_ids if x != self.genie.id]
-
-        task = self.handle_command(command, adopter, match, mentioned_entity_ids)
-
-        if isinstance(task, str):
-            task = [task]
-
-        for event in task:
-            if isinstance(event, str):
-                event = ("send_message", adopter, event)
-
+        for event in self.agency_sync.handle_mention(
+            adopter, message, mentioned_entity_ids
+        ):
+            print("EVENT: ", event)
             await self.apply_event(event)
 
     async def apply_event(self, event):
