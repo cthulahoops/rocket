@@ -501,6 +501,9 @@ class AgencySync:
             pet.pos = entity["pos"]
             pet.bot_json["name"] = entity["name"]
 
+    def handle_avatar(self, entity):
+        self.avatars[entity["id"]] = entity
+
 
 class Agency:
     """
@@ -519,9 +522,6 @@ class Agency:
         self.agency_sync = AgencySync(genie, pet_directory)
 
         self._pet_update_queues = UpdateQueues(self.queue_iterator)
-
-    def __getattr__(self, name):
-        return self.agency_sync.__getattribute__(name)
 
     async def __aenter__(self):
         return self
@@ -608,7 +608,7 @@ class Agency:
         )
 
     def handle_command(self, command, adopter, match, mentioned_entities):
-        handler = getattr(self, f"handle_{command}")
+        handler = getattr(self.agency_sync, f"handle_{command}")
         if command == "give_pet":
             return handler(adopter, match, mentioned_entities)
         return handler(adopter, match)
@@ -654,7 +654,7 @@ class Agency:
 
     async def handle_entity(self, entity):
         if entity["type"] == "Avatar":
-            self.avatars[entity["id"]] = entity
+            self.agency_sync.handle_avatar(entity)
 
             message = entity.get("message")
 
@@ -669,11 +669,11 @@ class Agency:
                     self.processed_message_dt = message_dt
 
         if entity["type"] == "Avatar":
-            for event in self.handle_avatar_move(entity):
+            for event in self.agency_sync.handle_avatar_move(entity):
                 await self.apply_event(event)
 
         if entity["type"] == "Bot":
-            self.handle_bot(entity)
+            self.agency_sync.handle_bot(entity)
 
 
 def get_one_by_type(pet_type, pets):
