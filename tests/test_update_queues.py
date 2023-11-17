@@ -1,6 +1,9 @@
 import asyncio
 import pytest
 from pets.update_queues import UpdateQueues, deduplicated_updates
+import pets.update_queues
+
+pets.update_queues.SLEEP_AFTER_UPDATE = 0.01
 
 
 @pytest.mark.asyncio

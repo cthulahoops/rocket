@@ -610,7 +610,9 @@ class Agency:
                     break
                 except asyncio.TimeoutError:
                     if pet and pet.owner and not pet.is_in_day_care_center:
-                        yield CORRAL.random_point()
+                        yield rctogether.bots.update(
+                            self.session, pet.id, CORRAL.random_point()
+                        )
                 except StopAsyncIteration:
                     return
 

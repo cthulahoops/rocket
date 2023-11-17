@@ -1,7 +1,7 @@
 import asyncio
 import rctogether
 
-SLEEP_AFTER_UPDATE = 0.001
+SLEEP_AFTER_UPDATE = 0.5
 
 
 class UpdateQueues:
@@ -51,8 +51,6 @@ async def get_all_available_updates(queue):
 async def deduplicated_updates(queue, queue_id=None):
     while True:
         updates = await get_all_available_updates(queue)
-
-        print("Updates: ", updates)
 
         if updates[-1] is None:
             while updates and updates[-1] is None:
