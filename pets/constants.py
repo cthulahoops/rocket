@@ -60,3 +60,9 @@ PETS = [
 ANIMAL_NAMES = {pet["name"].lower() for pet in PETS}
 MANNER_WORDS = {manner.lower() for manner in MANNERS}
 
+# Precompute manner prefixes for efficient matching
+# Split multi-word manners and get their first words for prefix matching
+MANNER_PREFIXES = set()
+for manner in MANNER_WORDS:
+    first_word = manner.split()[0]
+    MANNER_PREFIXES.add(first_word)
