@@ -10,6 +10,7 @@ import time
 
 import rctogether
 
+from .constants import MANNERS, PETS
 from .parser import parse_command
 from .update_queues import UpdateQueues
 from . import update_queues
@@ -61,46 +62,6 @@ HELP_TEXT = textwrap.dedent(
         The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
 )
 
-PETS = [
-    {"emoji": "🦇", "name": "bat", "noise": "screech!"},
-    {"emoji": "🐻", "name": "bear", "noise": "ROAR!"},
-    {"emoji": "🐝", "name": "bee", "noise": "buzz!"},
-    {"emoji": "🦕", "name": "brontosaurus", "noise": "MEEEHHH!"},
-    {"emoji": "🐫", "name": "camel"},
-    {"emoji": "🐈", "name": "cat", "noise": "miaow!"},
-    {"emoji": "🐛", "name": "caterpillar", "noise": "munch!"},
-    {"emoji": "🐄", "name": "cow", "noise": "Moo!"},
-    {"emoji": "🦀", "name": "crab", "noise": "click!"},
-    {"emoji": "🐊", "name": "crocodile"},
-    {"emoji": "🐕", "name": "dog", "noise": "woof!"},
-    {"emoji": "🐉", "name": "dragon", "noise": "🔥"},
-    {"emoji": "🦅", "name": "eagle"},
-    {"emoji": "🐘", "name": "elephant"},
-    {"emoji": "🦩", "name": "flamingo"},
-    {"emoji": "🦊", "name": "fox", "noise": "Wrahh!"},
-    {"emoji": "🐸", "name": "frog", "noise": "ribbet!"},
-    {"emoji": "🦒", "name": "giraffe"},
-    {"emoji": "🦔", "name": "hedgehog", "noise": "scurry, scurry, scurry"},
-    {"emoji": "🦛", "name": "hippo"},
-    {"emoji": "👾", "name": "invader"},
-    {"emoji": "🦘", "name": "kangaroo", "noise": "Chortle chortle!"},
-    {"emoji": "🐨", "name": "koala", "noise": "gggrrrooowwwlll"},
-    {"emoji": "🦙", "name": "llama"},
-    {"emoji": "🐁", "name": "mouse", "noise": "squeak!"},
-    {"emoji": "🦉", "name": "owl", "noise": "hoot hoot!"},
-    {"emoji": "🦜", "name": "parrot", "noise": "HELLO!"},
-    {"emoji": "🐧", "name": "penguin"},
-    {"emoji": "🐖", "name": "pig", "noise": "oink!"},
-    {"emoji": "🐇", "name": "rabbit"},
-    {"emoji": "🚀", "name": "rocket"},
-    {"emoji": "🐌", "name": "snail", "noise": "slurp!"},
-    {"emoji": "🦖", "name": "t-rex", "noise": "RAWR!"},
-    {"emoji": "🐅", "name": "tiger"},
-    {"emoji": "🐢", "name": "turtle", "noise": "hiss!"},
-    {"emoji": "🦄", "name": "unicorn", "noise": "✨"},
-    {"emoji": "🪨", "name": "rock", "noise": "🤘"},
-]
-
 NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
 GENIE_NAME = os.environ.get("GENIE_NAME", "Pet Agency Genie")
@@ -129,22 +90,6 @@ SAD_MESSAGE_TEMPLATES = [
     "Did I do something wrong?",
     "But why?",
     "💔",
-]
-
-MANNERS = [
-    "please",
-    "bitte",
-    "le do thoil",
-    "sudo",
-    "per favore",
-    "oh mighty djinn",
-    "s'il vous plaît",
-    "s'il vous plait",
-    "svp",
-    "por favor",
-    "kudasai",
-    "onegai shimasu",
-    "пожалуйста",
 ]
 
 THANKS_RESPONSES = ["You're welcome!", "No problem!", "❤️"]
@@ -481,8 +426,6 @@ class AgencySync:
                 yield ("update_pet", pet, pet_update)
 
     def handle_restock(self, restocker):
-        actions = []
-
         if self.pet_directory.empty_spawn_points():
             pet = min(
                 self.pet_directory.available(), key=lambda pet: pet.id, default=None
@@ -530,20 +473,20 @@ class AgencySync:
         if not parsed:
             return "Sorry, I don't understand. Would you like to adopt a pet?"
 
-        command, match = parsed
+        command, groups = parsed
 
         handler = getattr(self, f"handle_{command}")
         if command == "give_pet":
             return handler(
                 adopter,
-                match.group(1),
+                groups[0],
                 [
                     entity_id
                     for entity_id in mentioned_entities
                     if entity_id != self.genie.id
                 ],
             )
-        return handler(adopter, *match.groups())
+        return handler(adopter, *groups)
 
     def handle_mention(self, adopter, message, mentioned_entity_ids):
         if self.genie.id not in mentioned_entity_ids:
