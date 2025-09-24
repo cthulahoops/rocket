@@ -476,20 +476,20 @@ class AgencySync:
         if not parsed:
             return "Sorry, I don't understand. Would you like to adopt a pet?"
 
-        command, match = parsed
+        command, groups = parsed
 
         handler = getattr(self, f"handle_{command}")
         if command == "give_pet":
             return handler(
                 adopter,
-                match.group(1),
+                groups[0],
                 [
                     entity_id
                     for entity_id in mentioned_entities
                     if entity_id != self.genie.id
                 ],
             )
-        return handler(adopter, *match.groups())
+        return handler(adopter, *groups)
 
     def handle_mention(self, adopter, message, mentioned_entity_ids):
         if self.genie.id not in mentioned_entity_ids:

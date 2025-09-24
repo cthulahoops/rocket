@@ -15,7 +15,7 @@ COMMANDS = {
 }
 
 
-def parse_adoption(message: str) -> Optional[Match]:
+def parse_adoption(message: str) -> Optional[tuple]:
     """Special parser for adoption commands that handles 'pet' ambiguity."""
     pet_match = re.search(
         r"(.*adopt (?:a|an|the|one)? ([A-Za-z'-]+)\s*([A-Za-z'-]*).*)",
@@ -37,23 +37,16 @@ def parse_adoption(message: str) -> Optional[Match]:
     return (pet_match.group(0), first_word)
 
 
-def parse_command(message: str) -> Optional[Tuple[str, Match]]:
+def parse_command(message: str) -> Optional[tuple]:
     # Special handling for adoption commands
     adoption_match = parse_adoption(message)
     if adoption_match:
-        return "adoption", Groups(adoption_match)
+        full_text, animal_type = adoption_match
+        return ("adoption", (full_text, animal_type))
 
     # Regular command parsing
     for pattern, command in COMMANDS.items():
         match = re.search(pattern, message, re.IGNORECASE)
         if match:
-            return command, match
+            return (command, match.groups())
     return None
-
-
-class Groups:
-    def __init__(self, args):
-        self.args = args
-
-    def groups(self):
-        return self.args
