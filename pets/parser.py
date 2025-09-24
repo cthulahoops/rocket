@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Tuple, Match
+from typing import Optional
 from .constants import MANNER_PREFIXES
 
 COMMANDS = {

@@ -10,6 +10,7 @@ import time
 
 import rctogether
 
+from .constants import MANNERS, PETS
 from .parser import parse_command
 from .update_queues import UpdateQueues
 from . import update_queues
@@ -60,8 +61,6 @@ HELP_TEXT = textwrap.dedent(
         I can help you adopt a pet! Just send me a message saying 'adopt the <pet type> please'.
         The agency is just north of the main space. Drop by to see the available pets, and read more instructions on the note by the door."""
 )
-
-from .constants import MANNERS, PETS
 
 NOISES = {pet["emoji"]: pet.get("noise", "💖") for pet in PETS}
 
@@ -427,8 +426,6 @@ class AgencySync:
                 yield ("update_pet", pet, pet_update)
 
     def handle_restock(self, restocker):
-        actions = []
-
         if self.pet_directory.empty_spawn_points():
             pet = min(
                 self.pet_directory.available(), key=lambda pet: pet.id, default=None
