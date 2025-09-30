@@ -95,7 +95,7 @@ class Bot:
         await self.queue.put(update)
 
     async def destroy(self, session):
-        rctogether.bots.delete(session, self.id)
+        await rctogether.bots.delete(session, self.id)
 
     def update_data(self, data):
         self.bot_json = data
@@ -183,6 +183,10 @@ class ClankyBotLauchSystem:
             self.gc_bot.handle_update(entity)
 
 
+GARBAGE_COLLECTION_HOME = {"x": 22, "y": 61}
+MIN_GARBAGE_TO_COLLECT = 3
+
+
 class GarbageCollectionBot:
     def __init__(self, session, garbage_bot):
         self.session = session
@@ -193,7 +197,10 @@ class GarbageCollectionBot:
     @classmethod
     async def create(cls, session):
         garbage_bot = await Bot.create(
-            session, name="Garbage Collector", emoji="🛺", x=22, y=61
+            session,
+            name="Garbage Collector",
+            emoji="🛺",
+            **GARBAGE_COLLECTION_HOME,
         )
         gc_bot = cls(session, garbage_bot)
         asyncio.create_task(gc_bot.run(session))
@@ -201,7 +208,7 @@ class GarbageCollectionBot:
 
     async def run(self, session):
         while True:
-            if self.garbage_queue.qsize() <= 0:
+            if self.garbage_queue.qsize() <= MIN_GARBAGE_TO_COLLECT:
                 await asyncio.sleep(60)
             elif self.garbage:
                 print("Hey, we're already busy here.")
@@ -226,7 +233,7 @@ class GarbageCollectionBot:
         print("Ready to complete collection!")
         await self.garbage.destroy(self.session)
         self.garbage = None
-        await self.garbage_bot.update({"x": 22, "y": 61})
+        await self.garbage_bot.update(GARBAGE_COLLECTION_HOME)
 
     def handle_update(self, entity):
         if self.garbage and entity["pos"] == self.garbage.pos:
