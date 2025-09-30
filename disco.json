@@ -5,6 +5,8 @@
             "type": "static",
             "publicPath": "public"
         },
-        "genie_bot": {}
+        "rocket_bot": {
+            "command": "uv run rocket.py"
+        }
     }
 }

@@ -14,6 +14,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 WORKDIR /code
 COPY uv.lock pyproject.toml /code/
 RUN uv sync --frozen --no-dev
-COPY pets /code/pets
+COPY rocket.py /code/
 
-CMD uv run python -m pets
+CMD uv run python rocket.py
