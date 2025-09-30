@@ -493,15 +493,15 @@ wheels = [
 
 [[package]]
 name = "rctogether"
-version = "0.3.3"
+version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7f/f2/35e5e2384fc3299744deadc05b3eb08240a8b8dda3f988529e005e5b1ac2/rctogether-0.3.3.tar.gz", hash = "sha256:9e6aa594772e8efd32dde6d15c0b439c9866e5fbd533a91e96eca90cd022d200", size = 3614 }
+sdist = { url = "https://files.pythonhosted.org/packages/11/75/f4dd0f3d6d929fe4b0523c4812af640ebaa9a253764c5159faf51cd4403b/rctogether-0.3.4.tar.gz", hash = "sha256:0d6bf679a8640827d86791f2744213b0aff2cf4d59a73bdb14fd006109b2262b", size = 7550 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/99/38b46221b1bb1dbd7dbf8ed0c0ba52312c5e27ad6e69b1349c34f7a087f3/rctogether-0.3.3-py3-none-any.whl", hash = "sha256:8d89790f102f8c893a814a7fbe8135f701d431c26009d637cfb6c4cd2efe43ba", size = 5065 },
+    { url = "https://files.pythonhosted.org/packages/58/13/d11b9569ec3ced451a44b2ad5de73ac5318396c737643b8d2902d660574b/rctogether-0.3.4-py3-none-any.whl", hash = "sha256:00bf0d8013716716a7c40aa6264e83b9d9e8b38294b527ef8bf8b2ec6b46dd01", size = 5133 },
 ]
 
 [[package]]
