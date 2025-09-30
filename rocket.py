@@ -103,7 +103,7 @@ class Bot:
         self.bot_json = data
 
 
-class ClankyBotLauchSystem:
+class ClankyBotLaunchSystem:
     def __init__(self, session, rocket, gc_bot):
         self.instigator = None
         self.target = "Nobody"
@@ -248,7 +248,7 @@ async def main():
         try:
             await rctogether.bots.delete_all(session)
 
-            launch_system = await ClankyBotLauchSystem.create(session)
+            launch_system = await ClankyBotLaunchSystem.create(session)
             async for entity in rctogether.WebsocketSubscription():
                 await launch_system.handle_entity(entity)
         finally:
