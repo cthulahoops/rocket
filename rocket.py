@@ -3,7 +3,9 @@ import random
 import asyncio
 
 import rctogether
-from bot import Bot
+
+# Currently we reimplement our own Bot class here.
+# from bot import Bot
 
 logging.basicConfig(level=logging.INFO)
 
