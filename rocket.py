@@ -175,7 +175,7 @@ class ClankyBotLaunchSystem:
         if person_name == self.target:
             await self.handle_target_detected(entity)
 
-        elif entity.get("pos") == {"x": 27, "y": 61}:
+        elif entity.get("pos") == CONTROL_COMPUTER:
             await self.handle_instruction(entity)
 
         elif entity["id"] == self.rocket.id:
