@@ -195,6 +195,7 @@ class GarbageCollectionBot:
         self.garbage_bot = garbage_bot
         self.garbage_queue = asyncio.Queue()
         self.garbage = None
+        self.task = None
 
     @classmethod
     async def create(cls, session):
@@ -205,10 +206,10 @@ class GarbageCollectionBot:
             **GARBAGE_COLLECTION_HOME,
         )
         gc_bot = cls(session, garbage_bot)
-        asyncio.create_task(gc_bot.run(session))
+        gc_bot.task = asyncio.create_task(gc_bot.run())
         return gc_bot
 
-    async def run(self, session):
+    async def run(self):
         while True:
             if self.garbage_queue.qsize() <= MIN_GARBAGE_TO_COLLECT:
                 await asyncio.sleep(60)
